@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { X, Moon, Sun, Mic2, Globe, Layers, Zap, AlignLeft } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { X, Moon, Sun, Mic2, Globe, Layers, Zap, AlignLeft, Check } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 import { platforms } from '../platforms';
 
@@ -13,12 +13,33 @@ const contentLengths = [
 export default function SettingsPanel({ isOpen, onClose }) {
   const { settings, updateSetting } = useSettings();
   const panelRef = useRef(null);
+  const [draftVoice, setDraftVoice] = useState(settings.brandVoice);
+  const [saved, setSaved] = useState(false);
+
+  const hasChanges = draftVoice !== settings.brandVoice;
+
+  useEffect(() => {
+    setDraftVoice(settings.brandVoice);
+    setSaved(false);
+  }, [isOpen]);
 
   useEffect(() => {
     const handleKeyDown = (e) => { if (e.key === 'Escape') onClose(); };
     if (isOpen) document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
+
+  const handleSaveVoice = () => {
+    updateSetting('brandVoice', draftVoice);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleClearVoice = () => {
+    setDraftVoice('');
+    updateSetting('brandVoice', '');
+    setSaved(false);
+  };
 
   const togglePlatformDefault = (id) => {
     const curr = settings.defaultPlatforms;
@@ -53,17 +74,36 @@ export default function SettingsPanel({ isOpen, onClose }) {
             <textarea
               style={styles.brandVoiceInput}
               placeholder={`e.g. "Speak like a confident founder — direct, warm, no fluff. Use simple words. Avoid corporate jargon. Sound like you're texting a smart friend."`}
-              value={settings.brandVoice}
-              onChange={(e) => updateSetting('brandVoice', e.target.value)}
+              value={draftVoice}
+              onChange={(e) => { setDraftVoice(e.target.value); setSaved(false); }}
               rows={5}
               onFocus={(e) => { e.target.style.borderColor = 'var(--text-muted)'; }}
               onBlur={(e) => { e.target.style.borderColor = 'var(--border-color)'; }}
             />
-            {settings.brandVoice && (
-              <button style={styles.clearBtn} onClick={() => updateSetting('brandVoice', '')}>
-                Clear voice
+            <div style={styles.voiceActions}>
+              {draftVoice && (
+                <button style={styles.clearBtn} onClick={handleClearVoice}>
+                  Clear voice
+                </button>
+              )}
+              <button
+                style={{
+                  ...styles.saveVoiceBtn,
+                  backgroundColor: saved ? 'transparent' : (hasChanges ? 'var(--text-main)' : 'transparent'),
+                  color: saved ? 'var(--text-muted)' : (hasChanges ? 'var(--bg-color)' : 'var(--text-muted)'),
+                  borderColor: saved ? 'var(--border-color)' : (hasChanges ? 'var(--text-main)' : 'var(--border-color)'),
+                  cursor: hasChanges && !saved ? 'pointer' : 'default',
+                }}
+                onClick={handleSaveVoice}
+                disabled={!hasChanges || saved}
+              >
+                {saved ? (
+                  <><Check size={13} style={{ marginRight: '5px' }} />Saved</>
+                ) : (
+                  hasChanges ? 'Save changes' : 'Saved'
+                )}
               </button>
-            )}
+            </div>
           </section>
 
           <div style={styles.divider} />
@@ -299,8 +339,13 @@ const styles = {
     resize: 'vertical',
     transition: 'border-color 0.2s',
   },
+  voiceActions: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: '10px',
+  },
   clearBtn: {
-    marginTop: '8px',
     background: 'transparent',
     border: 'none',
     color: 'var(--text-muted)',
@@ -308,6 +353,18 @@ const styles = {
     cursor: 'pointer',
     padding: '2px 0',
     textDecoration: 'underline',
+  },
+  saveVoiceBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    border: '1px solid',
+    borderRadius: '6px',
+    padding: '7px 16px',
+    fontSize: '0.85rem',
+    fontFamily: 'var(--font-body)',
+    fontWeight: '500',
+    transition: 'all 0.2s ease',
+    marginLeft: 'auto',
   },
   toggleRow: {
     display: 'flex',
