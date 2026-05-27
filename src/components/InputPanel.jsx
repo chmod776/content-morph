@@ -1,7 +1,7 @@
 import React from 'react';
 import { Send, Save, Link, Calendar, History, Settings, User } from 'lucide-react';
 
-export default function InputPanel({ input, setInput, isGenerating, onGenerate, onSave }) {
+export default function InputPanel({ input, setInput, isGenerating, onGenerate, onSave, onSettingsOpen }) {
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -20,7 +20,7 @@ export default function InputPanel({ input, setInput, isGenerating, onGenerate, 
           <button style={styles.iconBtn} title="History">
             <History size={16} />
           </button>
-          <button style={styles.iconBtn} title="Settings">
+          <button style={styles.iconBtn} title="Settings" onClick={onSettingsOpen}>
             <Settings size={16} />
           </button>
         </div>
