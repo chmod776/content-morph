@@ -173,7 +173,7 @@ const styles = {
     width: '100%',
     minHeight: '160px',
     resize: 'vertical',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: 'var(--bg-color)',
     color: 'var(--text-main)',
     border: '1px solid var(--border-color)',
     borderRadius: '16px',
