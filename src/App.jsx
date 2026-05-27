@@ -125,14 +125,16 @@ export default function App() {
               const text = parsed?.choices?.[0]?.delta?.content || '';
               if (text) {
                 fullText += text;
-                streamingRef.current[platformId] = (streamingRef.current[platformId] || '') + text;
+                streamingRef.current[platformId] = fullText;
                 scheduleStreamUpdate();
               }
             }
           }
         }
 
+        // Always commit the final complete text, regardless of RAF timing
         delete streamingRef.current[platformId];
+        setOutputs(prev => ({ ...prev, [platformId]: fullText }));
       } else {
         const data = await response.json();
         fullText = data.choices[0]?.message?.content || '';
