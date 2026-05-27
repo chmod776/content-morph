@@ -1,7 +1,7 @@
 import React from 'react';
 import { Send, Save, Link, Calendar, History, Settings, User } from 'lucide-react';
 
-export default function InputPanel({ input, setInput, isGenerating, onGenerate, onSave, onSettingsOpen }) {
+export default function InputPanel({ input, setInput, isGenerating, onGenerate, onSave, onSettingsOpen, onHistoryOpen, historyCount }) {
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -17,8 +17,11 @@ export default function InputPanel({ input, setInput, isGenerating, onGenerate, 
           <button style={styles.iconBtn} title="Calendar">
             <Calendar size={16} />
           </button>
-          <button style={styles.iconBtn} title="History">
+          <button style={{ ...styles.iconBtn, position: 'relative' }} title="History" onClick={onHistoryOpen}>
             <History size={16} />
+            {historyCount > 0 && (
+              <span style={styles.historyBadge}>{historyCount > 9 ? '9+' : historyCount}</span>
+            )}
           </button>
           <button style={styles.iconBtn} title="Settings" onClick={onSettingsOpen}>
             <Settings size={16} />
@@ -142,6 +145,19 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'background-color 0.2s, color 0.2s'
+  },
+  historyBadge: {
+    position: 'absolute',
+    top: '2px',
+    right: '2px',
+    backgroundColor: 'var(--text-main)',
+    color: 'var(--bg-color)',
+    borderRadius: '10px',
+    fontSize: '0.6rem',
+    fontWeight: '700',
+    padding: '1px 4px',
+    lineHeight: '1.4',
+    fontFamily: 'var(--font-aesthetic)',
   },
   subtitle: {
     margin: '0 0 24px 0',

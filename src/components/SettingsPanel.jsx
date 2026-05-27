@@ -138,8 +138,8 @@ export default function SettingsPanel({ isOpen, onClose }) {
                   }}
                   onClick={() => updateSetting('contentLength', opt.value)}
                 >
-                  <span style={{ color: 'var(--text-main)', fontWeight: settings.contentLength === opt.value ? '600' : '400' }}>{opt.label}</span>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{opt.desc}</span>
+                  <span style={{ color: 'var(--text-main)', fontWeight: settings.contentLength === opt.value ? '600' : '400', flexShrink: 0 }}>{opt.label}</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.desc}</span>
                 </button>
               ))}
             </div>
@@ -373,7 +373,7 @@ const styles = {
     transition: 'all 0.15s',
     textAlign: 'left',
     gap: '16px',
-    whiteSpace: 'nowrap',
+    overflow: 'hidden',
   },
   platformChip: {
     padding: '8px 16px',

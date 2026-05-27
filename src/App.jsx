@@ -3,8 +3,21 @@ import InputPanel from './components/InputPanel';
 import PlatformSelector from './components/PlatformSelector';
 import OutputGrid from './components/OutputGrid';
 import SettingsPanel from './components/SettingsPanel';
+import HistoryPanel from './components/HistoryPanel';
 import { platforms } from './platforms';
 import { useSettings } from './context/SettingsContext';
+
+const MAX_HISTORY = 50;
+
+function loadHistory() {
+  try {
+    return JSON.parse(localStorage.getItem('contentmorph-history') || '[]');
+  } catch { return []; }
+}
+
+function saveHistory(h) {
+  localStorage.setItem('contentmorph-history', JSON.stringify(h));
+}
 
 export default function App() {
   const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
@@ -16,6 +29,8 @@ export default function App() {
   const [loadingStates, setLoadingStates] = useState({});
   const [errors, setErrors] = useState({});
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState(loadHistory);
 
   const togglePlatform = (id) => {
     setSelectedPlatforms(prev =>
@@ -73,6 +88,8 @@ export default function App() {
         throw new Error(`API Error: ${response.status}`);
       }
 
+      let fullText = '';
+
       if (useStreaming) {
         const reader = response.body.getReader();
         const decoder = new TextDecoder('utf-8');
@@ -90,6 +107,7 @@ export default function App() {
                 const data = JSON.parse(line.trim().slice(6));
                 const text = data.choices[0]?.delta?.content || '';
                 if (text) {
+                  fullText += text;
                   setOutputs(prev => ({
                     ...prev,
                     [platformId]: (prev[platformId] || '') + text
@@ -103,15 +121,32 @@ export default function App() {
         }
       } else {
         const data = await response.json();
-        const text = data.choices[0]?.message?.content || '';
-        setOutputs(prev => ({ ...prev, [platformId]: text }));
+        fullText = data.choices[0]?.message?.content || '';
+        setOutputs(prev => ({ ...prev, [platformId]: fullText }));
       }
+
+      return fullText;
     } catch (err) {
       console.error(`Error generating for ${platformId}:`, err);
       setErrors(prev => ({ ...prev, [platformId]: true }));
+      return null;
     } finally {
       setLoadingStates(prev => ({ ...prev, [platformId]: false }));
     }
+  };
+
+  const addToHistory = (inputText, platforms, completedOutputs) => {
+    const entry = {
+      id: Date.now(),
+      input: inputText,
+      selectedPlatforms: platforms,
+      outputs: completedOutputs,
+    };
+    setHistory(prev => {
+      const next = [entry, ...prev].slice(0, MAX_HISTORY);
+      saveHistory(next);
+      return next;
+    });
   };
 
   const handleGenerate = () => {
@@ -119,9 +154,43 @@ export default function App() {
       alert("OpenAI API Key is missing! Please set VITE_OPENAI_API_KEY in your environment.");
       return;
     }
-    selectedPlatforms.forEach(platformId => {
-      generateForPlatform(platformId, input);
+    const currentInput = input;
+    const currentPlatforms = [...selectedPlatforms];
+    const completedOutputs = {};
+    let completedCount = 0;
+
+    currentPlatforms.forEach(platformId => {
+      generateForPlatform(platformId, currentInput).then((result) => {
+        if (result) completedOutputs[platformId] = result;
+        completedCount++;
+        if (completedCount === currentPlatforms.length) {
+          if (Object.keys(completedOutputs).length > 0) {
+            addToHistory(currentInput, currentPlatforms, completedOutputs);
+          }
+        }
+      });
     });
+  };
+
+  const handleHistoryRestore = (entry) => {
+    setInput(entry.input);
+    setSelectedPlatforms(entry.selectedPlatforms);
+    setOutputs(entry.outputs);
+    setErrors({});
+    setLoadingStates({});
+  };
+
+  const handleHistoryDelete = (id) => {
+    setHistory(prev => {
+      const next = prev.filter(e => e.id !== id);
+      saveHistory(next);
+      return next;
+    });
+  };
+
+  const handleHistoryClear = () => {
+    setHistory([]);
+    saveHistory([]);
   };
 
   const handleSave = () => {
@@ -162,6 +231,8 @@ export default function App() {
           onGenerate={handleGenerate}
           onSave={handleSave}
           onSettingsOpen={() => setSettingsOpen(true)}
+          onHistoryOpen={() => setHistoryOpen(true)}
+          historyCount={history.length}
         />
         <PlatformSelector
           selectedPlatforms={selectedPlatforms}
@@ -179,6 +250,14 @@ export default function App() {
       </main>
 
       <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <HistoryPanel
+        isOpen={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        history={history}
+        onRestore={handleHistoryRestore}
+        onDelete={handleHistoryDelete}
+        onClear={handleHistoryClear}
+      />
     </div>
   );
 }
