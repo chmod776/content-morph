@@ -5,7 +5,6 @@ const defaultSettings = {
   brandVoice: '',
   outputLanguage: 'English',
   defaultPlatforms: ['twitter', 'linkedin', 'instagram', 'youtube'],
-  streamingEnabled: true,
   contentLength: 'standard',
 };
 

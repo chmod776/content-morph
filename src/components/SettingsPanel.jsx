@@ -215,31 +215,6 @@ export default function SettingsPanel({ isOpen, onClose }) {
             </div>
           </section>
 
-          <div style={styles.divider} />
-
-          {/* Streaming */}
-          <section style={styles.section}>
-            <div style={styles.sectionHeader}>
-              <Zap size={16} style={{ marginRight: '8px', color: 'var(--text-muted)' }} />
-              <h3 style={styles.sectionTitle}>Live Streaming</h3>
-            </div>
-            <div style={styles.toggleRow}>
-              <div>
-                <div style={styles.toggleLabel}>Stream output as it generates</div>
-                <div style={styles.toggleDesc}>See words appear in real time (recommended)</div>
-              </div>
-              <button
-                style={{ ...styles.toggle, backgroundColor: settings.streamingEnabled ? 'var(--text-main)' : 'var(--border-color)' }}
-                onClick={() => updateSetting('streamingEnabled', !settings.streamingEnabled)}
-              >
-                <div style={{
-                  ...styles.toggleKnob,
-                  transform: settings.streamingEnabled ? 'translateX(22px)' : 'translateX(2px)',
-                }} />
-              </button>
-            </div>
-          </section>
-
         </div>
       </div>
     </>

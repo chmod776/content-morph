@@ -80,7 +80,6 @@ export default function App() {
     setOutputs(prev => ({ ...prev, [platformId]: '' }));
 
     const systemPrompt = buildSystemPrompt(platform.prompt);
-    const useStreaming = settings.streamingEnabled !== false;
 
     try {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -95,7 +94,7 @@ export default function App() {
             { role: 'system', content: systemPrompt },
             { role: 'user', content }
           ],
-          stream: useStreaming
+          stream: true
         })
       });
 
@@ -104,42 +103,35 @@ export default function App() {
       }
 
       let fullText = '';
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
 
-      if (useStreaming) {
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder('utf-8');
+      streamingRef.current[platformId] = '';
 
-        streamingRef.current[platformId] = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
 
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n');
-
-          for (const line of lines) {
-            if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-              let parsed = null;
-              try { parsed = JSON.parse(line.trim().slice(6)); } catch (e) { continue; }
-              const text = parsed?.choices?.[0]?.delta?.content || '';
-              if (text) {
-                fullText += text;
-                streamingRef.current[platformId] = fullText;
-                scheduleStreamUpdate();
-              }
+        for (const line of lines) {
+          if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+            let parsed = null;
+            try { parsed = JSON.parse(line.trim().slice(6)); } catch (e) { continue; }
+            const text = parsed?.choices?.[0]?.delta?.content || '';
+            if (text) {
+              fullText += text;
+              streamingRef.current[platformId] = fullText;
+              scheduleStreamUpdate();
             }
           }
         }
-
-        // Always commit the final complete text, regardless of RAF timing
-        delete streamingRef.current[platformId];
-        setOutputs(prev => ({ ...prev, [platformId]: fullText }));
-      } else {
-        const data = await response.json();
-        fullText = data.choices[0]?.message?.content || '';
-        setOutputs(prev => ({ ...prev, [platformId]: fullText }));
       }
+
+      // Always commit the final complete text, regardless of RAF timing
+      delete streamingRef.current[platformId];
+      setOutputs(prev => ({ ...prev, [platformId]: fullText }));
 
       return fullText;
     } catch (err) {
