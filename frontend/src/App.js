@@ -9,6 +9,7 @@ import SavedSessions from './components/SavedSessions';
 import SocialAccountsModal from './components/SocialAccountsModal';
 import PublishModal from './components/PublishModal';
 import ScheduledPostsModal from './components/ScheduledPostsModal';
+import BatchPublishModal from './components/BatchPublishModal';
 import { platforms } from './platforms';
 import { supabase } from './supabaseClient';
 
@@ -28,6 +29,7 @@ export default function App() {
   const [showSocialAccounts, setShowSocialAccounts] = useState(false);
   const [showScheduled, setShowScheduled] = useState(false);
   const [publishPlatform, setPublishPlatform] = useState(null);
+  const [showBatchPublish, setShowBatchPublish] = useState(false);
   const [session, setSession] = useState(null);
   const [pendingGenerate, setPendingGenerate] = useState(false);
 
@@ -308,6 +310,7 @@ export default function App() {
           errors={errors}
           onRetry={(platformId) => generateForPlatform(platformId, input)}
           onPublish={handlePublish}
+          onPublishAll={() => setShowBatchPublish(true)}
         />
       </main>
     </div>
