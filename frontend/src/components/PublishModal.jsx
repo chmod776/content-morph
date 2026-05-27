@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { X, Send, Calendar, CheckCircle2, AlertCircle, Loader, Link2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { X, Send, Calendar, CheckCircle2, AlertCircle, Loader, Link2, Image as ImageIcon, Paperclip, Film } from 'lucide-react';
 import { platforms } from '../platforms';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -16,14 +16,20 @@ export default function PublishModal({ session, platformId, content, onClose, on
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
   const [confirmStep, setConfirmStep] = useState(false);
+  const [media, setMedia] = useState(null); // {url, file_id, media_type, content_type, name}
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
-  const authHeader = useCallback(() => ({
+  const authHeaderJson = useCallback(() => ({
     'Authorization': `Bearer ${session?.access_token || ''}`,
     'Content-Type': 'application/json'
   }), [session]);
+  const authHeaderRaw = useCallback(() => ({
+    'Authorization': `Bearer ${session?.access_token || ''}`,
+  }), [session]);
 
   useEffect(() => {
-    fetch(`${API}/social/accounts`, { headers: authHeader() })
+    fetch(`${API}/social/accounts`, { headers: authHeaderJson() })
       .then(r => r.json())
       .then(data => {
         const acc = (data.accounts || []).find(a => a.platform === platformId);
@@ -31,17 +37,39 @@ export default function PublishModal({ session, platformId, content, onClose, on
         else setConnected(false);
       })
       .catch(() => setConnected(false));
-  }, [platformId, authHeader]);
+  }, [platformId, authHeaderJson]);
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch(`${API}/uploads`, { method: 'POST', headers: authHeaderRaw(), body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Upload failed');
+      setMedia({ ...data, name: file.name });
+    } catch (err) {
+      alert(`Upload failed: ${err.message}`);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const handleSubmit = async () => {
     setSubmitting(true); setResult(null);
     try {
       const endpoint = mode === 'now' ? 'post' : 'schedule';
-      const body = mode === 'now'
-        ? { platform: platformId, content: text }
-        : { platform: platformId, content: text, scheduled_at: new Date(scheduleAt).toISOString() };
+      const body = {
+        platform: platformId,
+        content: text,
+        ...(media ? { media_url: media.url, media_type: media.media_type } : {}),
+        ...(mode === 'schedule' ? { scheduled_at: new Date(scheduleAt).toISOString() } : {})
+      };
       const res = await fetch(`${API}/social/${endpoint}`, {
-        method: 'POST', headers: authHeader(), body: JSON.stringify(body)
+        method: 'POST', headers: authHeaderJson(), body: JSON.stringify(body)
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || data.error || 'Failed');
@@ -102,6 +130,54 @@ export default function PublishModal({ session, platformId, content, onClose, on
                   {text.length}{charLimit ? ` / ${charLimit}` : ''} characters
                 </span>
               </div>
+            </div>
+
+            <div style={styles.field}>
+              <label style={styles.label}>Media (optional)</label>
+              {!media ? (
+                <div style={styles.uploadRow}>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime"
+                    onChange={handleFileSelect}
+                    style={{ display: 'none' }}
+                    data-testid="publish-file-input"
+                    disabled={submitting || confirmStep || uploading}
+                  />
+                  <button
+                    type="button"
+                    style={styles.uploadBtn}
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={submitting || confirmStep || uploading}
+                    data-testid="publish-upload-btn"
+                  >
+                    {uploading ? <Loader size={14} style={{ animation: 'spin 1s linear infinite', marginRight: 6 }} /> : <Paperclip size={14} style={{ marginRight: 6 }} />}
+                    {uploading ? 'Uploading...' : 'Attach image or video'}
+                  </button>
+                  <span style={styles.uploadHint}>JPG/PNG/WebP/GIF up to 10 MB · MP4 up to 200 MB</span>
+                </div>
+              ) : (
+                <div style={styles.mediaPreview} data-testid="publish-media-preview">
+                  {media.media_type === 'image' ? (
+                    <img src={media.url} alt={media.name} style={styles.previewImg} />
+                  ) : (
+                    <div style={styles.videoIcon}><Film size={28} /></div>
+                  )}
+                  <div style={styles.mediaInfo}>
+                    <div style={styles.mediaName}>{media.name}</div>
+                    <div style={styles.mediaMeta}>{media.media_type} · {(media.size / 1024).toFixed(0)} KB</div>
+                  </div>
+                  {!confirmStep && !submitting && (
+                    <button style={styles.removeMediaBtn} onClick={() => setMedia(null)} data-testid="publish-remove-media">
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              )}
+              {platformId === 'instagram' && !media && (
+                <p style={styles.warnText}>Instagram requires an image or video.</p>
+              )}
             </div>
 
             <div style={styles.modeRow}>
@@ -205,6 +281,17 @@ const styles = {
   label: { fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' },
   textarea: { width: '100%', minHeight: '160px', backgroundColor: '#1a1a1a', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '14px', fontSize: '1rem', fontFamily: 'var(--font-body)', resize: 'vertical', outline: 'none', boxSizing: 'border-box' },
   charRow: { display: 'flex', justifyContent: 'flex-end', fontSize: '0.8rem' },
+  uploadRow: { display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' },
+  uploadBtn: { display: 'inline-flex', alignItems: 'center', background: 'transparent', border: '1px dashed var(--border-color)', color: 'var(--text-main)', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: '0.9rem' },
+  uploadHint: { fontSize: '0.75rem', color: 'var(--text-muted)' },
+  mediaPreview: { display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '10px' },
+  previewImg: { width: '64px', height: '64px', objectFit: 'cover', borderRadius: '6px' },
+  videoIcon: { width: '64px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', color: 'var(--text-muted)' },
+  mediaInfo: { flex: 1, minWidth: 0 },
+  mediaName: { fontSize: '0.9rem', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  mediaMeta: { fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' },
+  removeMediaBtn: { background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-muted)', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex' },
+  warnText: { margin: '6px 0 0 0', fontSize: '0.78rem', color: 'var(--accent-red)' },
   modeRow: { display: 'flex', gap: '10px', marginBottom: '16px' },
   modeBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, padding: '10px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: '0.92rem' },
   modeBtnActive: { borderColor: 'var(--text-main)', color: 'var(--text-main)', background: 'rgba(255,255,255,0.04)' },

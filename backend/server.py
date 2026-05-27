@@ -1,15 +1,16 @@
-from fastapi import FastAPI, APIRouter, Depends, HTTPException, Header, Request
+from fastapi import FastAPI, APIRouter, Depends, HTTPException, Header, Request, UploadFile, File, Response
 from fastapi.responses import RedirectResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-import os, logging, uuid, secrets, base64, hashlib, json
+import os, logging, uuid, secrets, base64, hashlib, json, mimetypes
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 import jwt as pyjwt
 import httpx
+import requests
 from urllib.parse import urlencode
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import asyncio
@@ -23,6 +24,50 @@ db = client[os.environ['DB_NAME']]
 
 APP_BASE_URL = os.environ.get('APP_BASE_URL', 'http://localhost:8001').rstrip('/')
 FRONTEND_URL = os.environ.get('FRONTEND_URL', APP_BASE_URL).rstrip('/')
+APP_NAME = os.environ.get('APP_NAME', 'content-morph')
+
+# ---------- Object Storage (Emergent) ----------
+STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
+EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
+_storage_key: Optional[str] = None
+
+def init_storage() -> Optional[str]:
+    global _storage_key
+    if _storage_key:
+        return _storage_key
+    if not EMERGENT_KEY:
+        return None
+    try:
+        resp = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_KEY}, timeout=30)
+        resp.raise_for_status()
+        _storage_key = resp.json()["storage_key"]
+        return _storage_key
+    except Exception as e:
+        logging.exception("Storage init failed")
+        return None
+
+def put_object(path: str, data: bytes, content_type: str) -> dict:
+    key = init_storage()
+    if not key:
+        raise HTTPException(500, "Object storage not initialized")
+    resp = requests.put(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key, "Content-Type": content_type},
+        data=data, timeout=120
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+def get_object(path: str) -> tuple:
+    key = init_storage()
+    if not key:
+        raise HTTPException(500, "Object storage not initialized")
+    resp = requests.get(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key}, timeout=60
+    )
+    resp.raise_for_status()
+    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -51,11 +96,15 @@ class SocialAccount(BaseModel):
 class PostRequest(BaseModel):
     platform: str
     content: str
+    media_url: Optional[str] = None
+    media_type: Optional[str] = None  # 'image' | 'video'
 
 class ScheduleRequest(BaseModel):
     platform: str
     content: str
     scheduled_at: str  # ISO datetime
+    media_url: Optional[str] = None
+    media_type: Optional[str] = None
 
 class DemoConnectRequest(BaseModel):
     platform: str
@@ -135,6 +184,60 @@ def redirect_uri(platform: str) -> str:
 @api_router.get("/")
 async def root():
     return {"message": "Content Morph API"}
+
+# ---------- File uploads ----------
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+ALLOWED_VIDEO_TYPES = {"video/mp4", "video/quicktime"}
+MAX_IMAGE_BYTES = 10 * 1024 * 1024   # 10 MB
+MAX_VIDEO_BYTES = 200 * 1024 * 1024  # 200 MB
+
+@api_router.post("/uploads")
+async def upload_file(file: UploadFile = File(...), user_id: str = Depends(get_user_id)):
+    ctype = (file.content_type or "").lower()
+    is_image = ctype in ALLOWED_IMAGE_TYPES
+    is_video = ctype in ALLOWED_VIDEO_TYPES
+    if not (is_image or is_video):
+        raise HTTPException(400, f"Unsupported file type: {ctype}. Allowed: jpg, png, webp, gif, mp4, mov.")
+    data = await file.read()
+    if is_image and len(data) > MAX_IMAGE_BYTES:
+        raise HTTPException(400, f"Image too large (max {MAX_IMAGE_BYTES // 1024 // 1024} MB)")
+    if is_video and len(data) > MAX_VIDEO_BYTES:
+        raise HTTPException(400, f"Video too large (max {MAX_VIDEO_BYTES // 1024 // 1024} MB)")
+
+    ext = (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else "bin"
+    file_id = str(uuid.uuid4())
+    storage_path = f"{APP_NAME}/uploads/{user_id}/{file_id}.{ext}"
+    result = put_object(storage_path, data, ctype)
+
+    record = {
+        "id": file_id,
+        "user_id": user_id,
+        "storage_path": result["path"],
+        "original_filename": file.filename,
+        "content_type": ctype,
+        "size": len(data),
+        "media_type": "image" if is_image else "video",
+        "is_deleted": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.files.insert_one(record)
+    public_url = f"{APP_BASE_URL}/api/files/{file_id}"
+    return {
+        "file_id": file_id,
+        "url": public_url,
+        "media_type": record["media_type"],
+        "content_type": ctype,
+        "size": len(data),
+    }
+
+@api_router.get("/files/{file_id}")
+async def serve_file(file_id: str):
+    """Public file serving — file_ids are unguessable UUIDs. Used by social platforms to fetch media."""
+    record = await db.files.find_one({"id": file_id, "is_deleted": False})
+    if not record:
+        raise HTTPException(404, "File not found")
+    data, content_type = get_object(record["storage_path"])
+    return Response(content=data, media_type=record.get("content_type") or content_type)
 
 @api_router.post("/status")
 async def create_status_check(input: StatusCheckCreate):
@@ -286,43 +389,122 @@ async def oauth_callback(platform: str, code: Optional[str] = None, state: Optio
     return RedirectResponse(f"{FRONTEND_URL}/?social=connected")
 
 # ---------- Posting ----------
-async def _post_to_platform(account: dict, content: str) -> dict:
+async def _twitter_upload_media(token: str, media_bytes: bytes, content_type: str) -> Optional[str]:
+    """Upload media to Twitter v1.1, return media_id_string. Works with OAuth 2.0 user tokens."""
+    try:
+        async with httpx.AsyncClient(timeout=60) as cli:
+            files = {"media": ("upload", media_bytes, content_type)}
+            r = await cli.post(
+                "https://upload.twitter.com/1.1/media/upload.json",
+                headers={"Authorization": f"Bearer {token}"},
+                files=files,
+            )
+            if r.status_code in (200, 201):
+                return r.json().get("media_id_string")
+            logger.warning(f"Twitter media upload failed {r.status_code}: {r.text[:200]}")
+            return None
+    except Exception:
+        logger.exception("Twitter media upload exception")
+        return None
+
+async def _fetch_media_bytes(media_url: str) -> tuple:
+    """Fetch bytes + content_type for a media url that we own (i.e., served by /api/files/{id})."""
+    async with httpx.AsyncClient(timeout=60) as cli:
+        r = await cli.get(media_url)
+        r.raise_for_status()
+        return r.content, r.headers.get("Content-Type", "application/octet-stream")
+
+async def _post_to_platform(account: dict, content: str, media_url: Optional[str] = None, media_type: Optional[str] = None) -> dict:
     """Returns dict with success/error. Demo accounts always succeed (simulated)."""
     if account.get('is_demo') or account.get('access_token') == 'demo-token':
-        return {"success": True, "demo": True, "message": f"Simulated post to {account['platform']}"}
+        return {"success": True, "demo": True, "message": f"Simulated post to {account['platform']}{' with media' if media_url else ''}"}
 
     platform = account['platform']
     token = account['access_token']
     try:
-        async with httpx.AsyncClient(timeout=30) as cli:
+        async with httpx.AsyncClient(timeout=60) as cli:
             if platform == 'twitter':
+                tweet_body = {"text": content[:280]}
+                if media_url:
+                    media_bytes, ctype = await _fetch_media_bytes(media_url)
+                    media_id = await _twitter_upload_media(token, media_bytes, ctype)
+                    if not media_id:
+                        return {"success": False, "error": "Twitter media upload failed"}
+                    tweet_body["media"] = {"media_ids": [media_id]}
                 r = await cli.post('https://api.twitter.com/2/tweets',
                     headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-                    json={"text": content[:280]})
+                    json=tweet_body)
                 if r.status_code in (200, 201):
                     return {"success": True, "id": r.json().get('data', {}).get('id')}
                 return {"success": False, "error": f"Twitter {r.status_code}: {r.text[:200]}"}
             elif platform == 'linkedin':
                 author = f"urn:li:person:{account.get('account_id')}"
+                share_content = {
+                    "shareCommentary": {"text": content},
+                    "shareMediaCategory": "NONE"
+                }
+                if media_url and media_type == 'image':
+                    # Register upload
+                    reg = await cli.post(
+                        'https://api.linkedin.com/v2/assets?action=registerUpload',
+                        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                        json={"registerUploadRequest": {
+                            "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
+                            "owner": author,
+                            "serviceRelationships": [{"relationshipType": "OWNER", "identifier": "urn:li:userGeneratedContent"}]
+                        }}
+                    )
+                    if reg.status_code in (200, 201):
+                        reg_data = reg.json().get('value', {})
+                        upload_url = reg_data.get('uploadMechanism', {}).get('com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest', {}).get('uploadUrl')
+                        asset_urn = reg_data.get('asset')
+                        if upload_url and asset_urn:
+                            media_bytes, _ = await _fetch_media_bytes(media_url)
+                            up = await cli.put(upload_url, headers={"Authorization": f"Bearer {token}"}, content=media_bytes)
+                            if up.status_code in (200, 201):
+                                share_content["shareMediaCategory"] = "IMAGE"
+                                share_content["media"] = [{
+                                    "status": "READY",
+                                    "description": {"text": content[:200]},
+                                    "media": asset_urn,
+                                    "title": {"text": "Post"}
+                                }]
                 r = await cli.post('https://api.linkedin.com/v2/ugcPosts',
                     headers={"Authorization": f"Bearer {token}", "X-Restli-Protocol-Version": "2.0.0",
                              "Content-Type": "application/json"},
                     json={
                         "author": author, "lifecycleState": "PUBLISHED",
-                        "specificContent": {"com.linkedin.ugc.ShareContent": {
-                            "shareCommentary": {"text": content},
-                            "shareMediaCategory": "NONE"}},
+                        "specificContent": {"com.linkedin.ugc.ShareContent": share_content},
                         "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
                     })
                 if r.status_code in (200, 201):
                     return {"success": True, "id": r.headers.get('x-restli-id')}
                 return {"success": False, "error": f"LinkedIn {r.status_code}: {r.text[:200]}"}
             elif platform == 'instagram':
-                # Instagram Graph API requires a media object then publish; for text-only return informative message
-                return {"success": False, "error": "Instagram requires an image/video. Text-only posts are not supported by the platform."}
+                if not media_url:
+                    return {"success": False, "error": "Instagram requires an image or video. Attach media before posting."}
+                ig_user_id = account.get('account_id')
+                if not ig_user_id:
+                    return {"success": False, "error": "Instagram Business account ID missing — reconnect the account."}
+                params = {"caption": content, "access_token": token}
+                if media_type == 'video':
+                    params["media_type"] = "REELS"
+                    params["video_url"] = media_url
+                else:
+                    params["image_url"] = media_url
+                # Create container
+                cr = await cli.post(f"https://graph.facebook.com/v18.0/{ig_user_id}/media", data=params)
+                if cr.status_code not in (200, 201):
+                    return {"success": False, "error": f"Instagram container {cr.status_code}: {cr.text[:200]}"}
+                container_id = cr.json().get('id')
+                # Publish container
+                pb = await cli.post(f"https://graph.facebook.com/v18.0/{ig_user_id}/media_publish",
+                                    data={"creation_id": container_id, "access_token": token})
+                if pb.status_code in (200, 201):
+                    return {"success": True, "id": pb.json().get('id')}
+                return {"success": False, "error": f"Instagram publish {pb.status_code}: {pb.text[:200]}"}
             elif platform == 'youtube':
-                # YouTube requires a video file; we can only update a community post via different endpoint
-                return {"success": False, "error": "YouTube posting requires a video file upload, not supported for text content."}
+                return {"success": False, "error": "YouTube posting requires a video file upload — not yet supported in this version."}
         return {"success": False, "error": "Unknown platform"}
     except Exception as e:
         logger.exception("Platform post failed")
@@ -333,11 +515,12 @@ async def post_now(req: PostRequest, user_id: str = Depends(get_user_id)):
     account = await db.social_accounts.find_one({"user_id": user_id, "platform": req.platform})
     if not account:
         raise HTTPException(400, f"No connected {req.platform} account")
-    result = await _post_to_platform(account, req.content)
+    result = await _post_to_platform(account, req.content, req.media_url, req.media_type)
     # Log post
     log = {
         "id": str(uuid.uuid4()), "user_id": user_id, "platform": req.platform,
         "content": req.content, "status": "posted" if result['success'] else "failed",
+        "media_url": req.media_url, "media_type": req.media_type,
         "result": json.dumps(result)[:500],
         "posted_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -363,7 +546,9 @@ async def schedule_post(req: ScheduleRequest, user_id: str = Depends(get_user_id
 
     post = {
         "id": str(uuid.uuid4()), "user_id": user_id, "platform": req.platform,
-        "content": req.content, "scheduled_at": scheduled_dt.isoformat(),
+        "content": req.content,
+        "media_url": req.media_url, "media_type": req.media_type,
+        "scheduled_at": scheduled_dt.isoformat(),
         "status": "pending", "created_at": datetime.now(timezone.utc).isoformat(),
         "error": None
     }
@@ -427,7 +612,7 @@ async def process_due_posts():
             await db.scheduled_posts.update_one({"id": post['id']},
                 {"$set": {"status": "failed", "error": "Account no longer connected"}})
             continue
-        result = await _post_to_platform(account, post['content'])
+        result = await _post_to_platform(account, post['content'], post.get('media_url'), post.get('media_type'))
         await db.scheduled_posts.update_one({"id": post['id']}, {
             "$set": {
                 "status": "posted" if result['success'] else "failed",
@@ -438,6 +623,7 @@ async def process_due_posts():
 
 @app.on_event("startup")
 async def startup_event():
+    init_storage()
     scheduler.add_job(process_due_posts, 'interval', seconds=30, id='process_scheduled')
     scheduler.start()
     logger.info("Scheduler started")

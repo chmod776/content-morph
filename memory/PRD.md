@@ -32,3 +32,20 @@ NEW: Users want to connect their social accounts and post (now or scheduled) dir
   - Backend endpoints: GET/POST/DELETE /api/social/presets
   - Frontend: preset chips in BatchPublishModal with save panel + per-platform time computation on load
 - Test status: 8/8 backend preset endpoint tests passed
+
+## Update (Feb 2026 - session 4)
+- Twitter OAuth verified end-to-end (real auth URL, correct scopes, callback routes)
+- Image/video upload feature added:
+  - Backend: /api/uploads (multipart, auth required, image up to 10MB, video up to 200MB)
+  - Public file serving via /api/files/{file_id} (unguessable UUIDs, no auth so social platforms can fetch)
+  - Storage backend: Emergent Object Storage (EMERGENT_LLM_KEY)
+  - MongoDB tracks file records with is_deleted flag
+- Posting with media:
+  - Twitter: v1.1 media/upload (chunked simple form) + v2 tweets with media_ids
+  - LinkedIn: assets registerUpload → PUT binary → ugcPosts with IMAGE category
+  - Instagram: graph.facebook.com /media (image_url/video_url) + /media_publish
+  - YouTube: still text-only (full video upload not yet implemented)
+- Frontend:
+  - PublishModal: image/video picker with thumbnail preview
+  - BatchPublishModal: per-platform media attachment (different media per platform allowed)
+- All flows tested: upload, public fetch, post with media, schedule with media, persisted in scheduler queue

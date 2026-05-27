@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { X, Send, Calendar, CheckCircle2, AlertCircle, Loader, Link2, SkipForward, BookmarkPlus, Bookmark, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { X, Send, Calendar, CheckCircle2, AlertCircle, Loader, Link2, SkipForward, BookmarkPlus, Bookmark, Trash2, Paperclip, Film } from 'lucide-react';
 import { platforms } from '../platforms';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -25,6 +25,12 @@ export default function BatchPublishModal({ session, outputs, selectedPlatforms,
   const [confirmStep, setConfirmStep] = useState(false);
   const [results, setResults] = useState({});  // platform -> {success, message}
 
+  // ---- Per-platform media ----
+  const [media, setMedia] = useState({}); // platform -> {url, file_id, media_type, name, size}
+  const [uploadingFor, setUploadingFor] = useState(null);
+  const fileInputRef = useRef(null);
+  const [uploadTarget, setUploadTarget] = useState(null); // which platform we are uploading for
+
   // ---- Presets state ----
   const [presets, setPresets] = useState([]);
   const [showSavePreset, setShowSavePreset] = useState(false);
@@ -35,6 +41,35 @@ export default function BatchPublishModal({ session, outputs, selectedPlatforms,
     'Authorization': `Bearer ${session?.access_token || ''}`,
     'Content-Type': 'application/json'
   }), [session]);
+  const authHeaderRaw = useCallback(() => ({
+    'Authorization': `Bearer ${session?.access_token || ''}`,
+  }), [session]);
+
+  const openFilePickerFor = (platform) => {
+    setUploadTarget(platform);
+    setTimeout(() => fileInputRef.current?.click(), 0);
+  };
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    const target = uploadTarget;
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (!file || !target) return;
+    setUploadingFor(target);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch(`${API}/uploads`, { method: 'POST', headers: authHeaderRaw(), body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Upload failed');
+      setMedia(prev => ({ ...prev, [target]: { ...data, name: file.name } }));
+    } catch (err) {
+      alert(`Upload failed for ${target}: ${err.message}`);
+    } finally {
+      setUploadingFor(null);
+      setUploadTarget(null);
+    }
+  };
 
   useEffect(() => {
     fetch(`${API}/social/accounts`, { headers: authHeader() })
@@ -69,9 +104,13 @@ export default function BatchPublishModal({ session, outputs, selectedPlatforms,
       setResults(prev => ({ ...prev, [p]: { pending: true } }));
       try {
         const endpoint = mode === 'now' ? 'post' : 'schedule';
-        const body = mode === 'now'
-          ? { platform: p, content: drafts[p] }
-          : { platform: p, content: drafts[p], scheduled_at: new Date(scheduleTimes[p]).toISOString() };
+        const m = media[p];
+        const body = {
+          platform: p,
+          content: drafts[p],
+          ...(m ? { media_url: m.url, media_type: m.media_type } : {}),
+          ...(mode === 'schedule' ? { scheduled_at: new Date(scheduleTimes[p]).toISOString() } : {})
+        };
         const res = await fetch(`${API}/social/${endpoint}`, {
           method: 'POST', headers: authHeader(), body: JSON.stringify(body)
         });
@@ -199,6 +238,15 @@ export default function BatchPublishModal({ session, outputs, selectedPlatforms,
               </div>
             )}
 
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime"
+              onChange={handleFileSelect}
+              style={{ display: 'none' }}
+              data-testid="batch-file-input"
+            />
+
             <div style={styles.cardList}>
               {initialPlatforms.map(p => {
                 const meta = platforms[p];
@@ -263,6 +311,49 @@ export default function BatchPublishModal({ session, outputs, selectedPlatforms,
                       />
                     ) : (
                       <div style={styles.previewBox}>{drafts[p]}</div>
+                    )}
+
+                    {connected && !isSkipped && (
+                      <div style={styles.cardMedia}>
+                        {media[p] ? (
+                          <div style={styles.cardMediaPreview}>
+                            {media[p].media_type === 'image' ? (
+                              <img src={media[p].url} alt="" style={styles.cardMediaImg} />
+                            ) : (
+                              <div style={styles.cardMediaVideoIcon}><Film size={20} /></div>
+                            )}
+                            <div style={styles.cardMediaInfo}>
+                              <div style={styles.cardMediaName}>{media[p].name}</div>
+                              <div style={styles.cardMediaMeta}>{media[p].media_type} · {(media[p].size / 1024).toFixed(0)} KB</div>
+                            </div>
+                            {!confirmStep && !result && (
+                              <button
+                                style={styles.cardMediaRemove}
+                                onClick={() => setMedia(prev => { const n = { ...prev }; delete n[p]; return n; })}
+                                data-testid={`batch-remove-media-${p}`}
+                              >
+                                <X size={12} />
+                              </button>
+                            )}
+                          </div>
+                        ) : !confirmStep && !result && (
+                          <button
+                            style={styles.cardMediaAddBtn}
+                            onClick={() => openFilePickerFor(p)}
+                            disabled={uploadingFor === p || submitting}
+                            data-testid={`batch-attach-${p}`}
+                          >
+                            {uploadingFor === p ? (
+                              <><Loader size={12} style={{ animation: 'spin 1s linear infinite', marginRight: 5 }} /> Uploading...</>
+                            ) : (
+                              <><Paperclip size={12} style={{ marginRight: 5 }} /> Attach media</>
+                            )}
+                          </button>
+                        )}
+                        {p === 'instagram' && !media[p] && !confirmStep && (
+                          <p style={styles.cardMediaWarn}>Required for Instagram.</p>
+                        )}
+                      </div>
                     )}
 
                     {mode === 'schedule' && connected && !isSkipped && (
@@ -455,6 +546,16 @@ const styles = {
   applyAllBtn: { background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', padding: '0 16px', borderRadius: '8px', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: '0.88rem', whiteSpace: 'nowrap' },
   helpText: { margin: '4px 0 0 0', fontSize: '0.76rem', color: 'var(--text-muted)' },
   presetsBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '10px 12px', backgroundColor: 'rgba(255,255,255,0.025)', borderRadius: '8px', marginBottom: '16px', flexWrap: 'wrap' },
+  cardMedia: { marginTop: '10px' },
+  cardMediaAddBtn: { display: 'inline-flex', alignItems: 'center', background: 'transparent', border: '1px dashed var(--border-color)', color: 'var(--text-muted)', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: '0.8rem' },
+  cardMediaPreview: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '8px' },
+  cardMediaImg: { width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px' },
+  cardMediaVideoIcon: { width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', color: 'var(--text-muted)' },
+  cardMediaInfo: { flex: 1, minWidth: 0 },
+  cardMediaName: { fontSize: '0.82rem', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  cardMediaMeta: { fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' },
+  cardMediaRemove: { background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px', borderRadius: '4px', display: 'flex' },
+  cardMediaWarn: { margin: '6px 0 0 0', fontSize: '0.72rem', color: 'var(--accent-red)' },
   presetsLeft: { display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 },
   presetsEmpty: { fontSize: '0.82rem', color: 'var(--text-muted)', fontStyle: 'italic' },
   presetChips: { display: 'flex', gap: '6px', flexWrap: 'wrap' },
