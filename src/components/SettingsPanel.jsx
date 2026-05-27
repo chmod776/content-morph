@@ -7,7 +7,7 @@ const languages = ['English', 'Spanish', 'French', 'German', 'Portuguese', 'Ital
 const contentLengths = [
   { value: 'concise', label: 'Concise', desc: 'Shorter, punchier output' },
   { value: 'standard', label: 'Standard', desc: 'Balanced length (default)' },
-  { value: 'detailed', label: 'Detailed', desc: 'More thorough, expansive output' },
+  { value: 'detailed', label: 'Detailed', desc: 'More thorough output' },
 ];
 
 export default function SettingsPanel({ isOpen, onClose }) {
