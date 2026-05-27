@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { flushSync } from 'react-dom';
 import InputPanel from './components/InputPanel';
 import PlatformSelector from './components/PlatformSelector';
 import OutputGrid from './components/OutputGrid';
@@ -108,10 +109,12 @@ export default function App() {
                 const text = data.choices[0]?.delta?.content || '';
                 if (text) {
                   fullText += text;
-                  setOutputs(prev => ({
-                    ...prev,
-                    [platformId]: (prev[platformId] || '') + text
-                  }));
+                  flushSync(() => {
+                    setOutputs(prev => ({
+                      ...prev,
+                      [platformId]: (prev[platformId] || '') + text
+                    }));
+                  });
                 }
               } catch (e) {
                 // Ignore parse errors from incomplete streamed lines
