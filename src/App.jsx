@@ -91,6 +91,32 @@ export default function App() {
     });
   };
 
+  const handleSave = () => {
+    if (!input.trim()) return;
+    const blob = new Blob([input], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'content-morph-draft.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handlePublishAll = () => {
+    const readyOutputs = selectedPlatforms
+      .filter(id => outputs[id] && !loadingStates[id])
+      .map(id => `=== ${platforms[id].name} ===\n\n${outputs[id]}`)
+      .join('\n\n\n');
+    if (!readyOutputs) return;
+    const blob = new Blob([readyOutputs], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'content-morph-all-platforms.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const isGenerating = Object.values(loadingStates).some(state => state);
 
   return (
@@ -101,6 +127,7 @@ export default function App() {
           setInput={setInput} 
           isGenerating={isGenerating}
           onGenerate={handleGenerate}
+          onSave={handleSave}
         />
         <PlatformSelector 
           selectedPlatforms={selectedPlatforms}
@@ -113,6 +140,7 @@ export default function App() {
           loadingStates={loadingStates}
           errors={errors}
           onRetry={(platformId) => generateForPlatform(platformId, input)}
+          onPublishAll={handlePublishAll}
         />
       </main>
       

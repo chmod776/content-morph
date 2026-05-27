@@ -1,11 +1,29 @@
 import React from 'react';
-import { Send } from 'lucide-react';
+import { Send, Save, Link, Calendar, History, Settings, User } from 'lucide-react';
 
-export default function InputPanel({ input, setInput, isGenerating, onGenerate }) {
+export default function InputPanel({ input, setInput, isGenerating, onGenerate, onSave }) {
   return (
     <div style={styles.container}>
       <div style={styles.header}>
         <h2 style={styles.title}>Content Morph</h2>
+        <div style={styles.headerIcons}>
+          <div style={styles.userChip}>
+            <User size={13} style={{ marginRight: '5px' }} />
+            <span style={styles.userName}>calebmamol</span>
+          </div>
+          <button style={styles.iconBtn} title="Share link">
+            <Link size={16} />
+          </button>
+          <button style={styles.iconBtn} title="Calendar">
+            <Calendar size={16} />
+          </button>
+          <button style={styles.iconBtn} title="History">
+            <History size={16} />
+          </button>
+          <button style={styles.iconBtn} title="Settings">
+            <Settings size={16} />
+          </button>
+        </div>
       </div>
       
       <p style={styles.subtitle}>Transform your raw notes into platform-ready posts.</p>
@@ -29,6 +47,20 @@ export default function InputPanel({ input, setInput, isGenerating, onGenerate }
         <div style={styles.footer}>
           <span style={styles.charCount}>{input.length} characters</span>
           
+          <button
+            style={{
+              ...styles.saveBtn,
+              opacity: !input.trim() ? 0.4 : 1,
+              cursor: !input.trim() ? 'not-allowed' : 'pointer'
+            }}
+            onClick={onSave}
+            disabled={!input.trim()}
+            title="Save content"
+          >
+            <Save size={15} style={{ marginRight: '6px' }} />
+            Save
+          </button>
+
           <button 
             style={{
               ...styles.transformBtn,
@@ -67,7 +99,9 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '8px'
+    paddingBottom: '24px',
+    borderBottom: '1px solid var(--border-color)',
+    marginBottom: '32px'
   },
   title: {
     margin: 0,
@@ -75,12 +109,29 @@ const styles = {
     fontWeight: '700',
     fontFamily: 'var(--font-heading)',
     letterSpacing: '-0.02em',
-    paddingBottom: '24px',
-    borderBottom: '1px solid var(--border-color)',
-    width: '100%',
-    marginBottom: '32px'
   },
-  settingsBtn: {
+  headerIcons: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px'
+  },
+  userChip: {
+    display: 'flex',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    border: '1px solid var(--border-color)',
+    borderRadius: '20px',
+    padding: '5px 12px',
+    color: 'var(--text-muted)',
+    fontSize: '0.85rem',
+    marginRight: '8px'
+  },
+  userName: {
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.82rem',
+    color: 'var(--text-muted)'
+  },
+  iconBtn: {
     background: 'transparent',
     border: 'none',
     color: 'var(--text-muted)',
@@ -88,6 +139,8 @@ const styles = {
     padding: '8px',
     borderRadius: '8px',
     display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     transition: 'background-color 0.2s, color 0.2s'
   },
   subtitle: {
@@ -119,18 +172,27 @@ const styles = {
     display: 'flex',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    gap: '16px',
+    gap: '12px',
     marginTop: '8px'
   },
   charCount: {
     color: 'var(--text-muted)',
     fontSize: '1rem',
-    fontWeight: '500'
+    fontWeight: '500',
+    marginRight: 'auto'
   },
-  warning: {
-    color: 'var(--accent-red)',
-    fontSize: '0.85rem',
-    fontWeight: '500'
+  saveBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    color: 'var(--text-muted)',
+    border: '1px solid var(--border-color)',
+    padding: '10px 20px',
+    borderRadius: '4px',
+    fontWeight: '500',
+    fontSize: '1rem',
+    fontFamily: 'var(--font-body)',
+    transition: 'all 0.2s ease'
   },
   transformBtn: {
     display: 'flex',
