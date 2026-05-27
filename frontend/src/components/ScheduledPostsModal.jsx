@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { X, Trash2, Clock, CheckCircle2, AlertCircle, List, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Trash2, Clock, CheckCircle2, AlertCircle, List, CalendarDays, CalendarRange, ChevronLeft, ChevronRight } from 'lucide-react';
 import { platforms } from '../platforms';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -15,8 +15,9 @@ const STATUS_META = {
 export default function ScheduledPostsModal({ session, onClose }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState('calendar'); // 'list' | 'calendar'
+  const [view, setView] = useState('calendar'); // 'list' | 'calendar' | 'week'
   const [cursor, setCursor] = useState(new Date()); // viewed month
+  const [weekCursor, setWeekCursor] = useState(new Date()); // viewed week (any date inside the week)
   const [selectedPost, setSelectedPost] = useState(null);
 
   const authHeader = useCallback(() => ({
@@ -82,6 +83,34 @@ export default function ScheduledPostsModal({ session, onClose }) {
     return map;
   }, [posts]);
 
+  // Week: 7 days starting Sunday of weekCursor
+  const weekDays = useMemo(() => {
+    const start = new Date(weekCursor);
+    start.setDate(start.getDate() - start.getDay()); // back to Sunday
+    start.setHours(0, 0, 0, 0);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(start);
+      d.setDate(d.getDate() + i);
+      return d;
+    });
+  }, [weekCursor]);
+
+  const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0..23
+
+  // posts indexed by `${dateKey}-${hour}`
+  const postsByHourSlot = useMemo(() => {
+    const map = {};
+    for (const p of posts) {
+      const d = new Date(p.scheduled_at);
+      const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}-${d.getHours()}`;
+      (map[k] ||= []).push(p);
+    }
+    for (const k of Object.keys(map)) {
+      map[k].sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
+    }
+    return map;
+  }, [posts]);
+
   const keyOf = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const todayKey = keyOf(new Date());
   const monthLabel = cursor.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
@@ -132,6 +161,86 @@ export default function ScheduledPostsModal({ session, onClose }) {
       </div>
     )
   );
+
+  const renderWeekView = () => {
+    const weekLabel = `${weekDays[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${weekDays[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    return (
+      <div style={styles.weekWrap} data-testid="week-view">
+        <div style={styles.calendarHeader}>
+          <button style={styles.navBtn} onClick={() => { const d = new Date(weekCursor); d.setDate(d.getDate() - 7); setWeekCursor(d); }} data-testid="week-prev">
+            <ChevronLeft size={16} />
+          </button>
+          <div style={styles.monthLabel}>{weekLabel}</div>
+          <button style={styles.navBtn} onClick={() => { const d = new Date(weekCursor); d.setDate(d.getDate() + 7); setWeekCursor(d); }} data-testid="week-next">
+            <ChevronRight size={16} />
+          </button>
+          <button style={styles.todayBtn} onClick={() => setWeekCursor(new Date())} data-testid="week-today">This Week</button>
+        </div>
+
+        <div style={styles.weekHeaderRow}>
+          <div style={styles.timeColHeader}></div>
+          {weekDays.map((d, i) => {
+            const isToday = keyOf(d) === todayKey;
+            return (
+              <div key={i} style={{ ...styles.weekDayHeader, color: isToday ? 'var(--text-main)' : 'var(--text-muted)', fontWeight: isToday ? 600 : 500 }}>
+                <div style={styles.weekDayName}>{d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                <div style={styles.weekDayNum}>{d.getDate()}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={styles.weekGrid}>
+          {HOURS.map(hour => (
+            <div key={hour} style={styles.weekHourRow}>
+              <div style={styles.timeColLabel}>
+                {hour === 0 ? '12 AM' : hour === 12 ? '12 PM' : hour < 12 ? `${hour} AM` : `${hour - 12} PM`}
+              </div>
+              {weekDays.map((day, di) => {
+                const slotKey = `${keyOf(day)}-${hour}`;
+                const slotPosts = postsByHourSlot[slotKey] || [];
+                return (
+                  <div key={di} style={styles.weekHourCell}>
+                    {slotPosts.map(post => {
+                      const meta = platforms[post.platform];
+                      const dim = post.status === 'cancelled' || post.status === 'failed';
+                      return (
+                        <button
+                          key={post.id}
+                          onClick={() => setSelectedPost(post)}
+                          style={{
+                            ...styles.weekChip,
+                            borderLeftColor: meta?.color || 'var(--text-muted)',
+                            opacity: dim ? 0.5 : 1,
+                            textDecoration: post.status === 'cancelled' ? 'line-through' : 'none',
+                          }}
+                          title={`${meta?.name} · ${fmtTime(post.scheduled_at)}\n${post.content.slice(0, 120)}`}
+                          data-testid={`week-chip-${post.id}`}
+                        >
+                          <span style={styles.weekChipTime}>{fmtTime(post.scheduled_at)}</span>
+                          <span style={styles.weekChipText}>{post.content.slice(0, 24)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+
+        {/* Legend */}
+        <div style={styles.legend}>
+          {Object.entries(platforms).map(([key, p]) => (
+            <span key={key} style={styles.legendItem}>
+              <span style={{ ...styles.legendDot, backgroundColor: p.color }}></span>
+              {p.name}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   const renderCalendarView = () => (
     <div style={styles.calendar} data-testid="calendar-view">
@@ -223,7 +332,14 @@ export default function ScheduledPostsModal({ session, onClose }) {
                 onClick={() => setView('calendar')}
                 data-testid="view-calendar"
               >
-                <CalendarDays size={14} style={{ marginRight: 5 }} /> Calendar
+                <CalendarDays size={14} style={{ marginRight: 5 }} /> Month
+              </button>
+              <button
+                style={{ ...styles.toggleBtn, ...(view === 'week' ? styles.toggleBtnActive : {}) }}
+                onClick={() => setView('week')}
+                data-testid="view-week"
+              >
+                <CalendarRange size={14} style={{ marginRight: 5 }} /> Week
               </button>
               <button
                 style={{ ...styles.toggleBtn, ...(view === 'list' ? styles.toggleBtnActive : {}) }}
@@ -239,7 +355,9 @@ export default function ScheduledPostsModal({ session, onClose }) {
 
         {loading ? (
           <div style={styles.empty}>Loading...</div>
-        ) : view === 'list' ? renderListView() : renderCalendarView()}
+        ) : view === 'list' ? renderListView()
+          : view === 'week' ? renderWeekView()
+          : renderCalendarView()}
 
         {selectedPost && (
           <div style={styles.detailOverlay} onClick={() => setSelectedPost(null)}>
@@ -318,6 +436,20 @@ const styles = {
   legend: { display: 'flex', gap: '14px', flexWrap: 'wrap', marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border-color)', justifyContent: 'center' },
   legendItem: { display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--text-muted)' },
   legendDot: { width: '10px', height: '10px', borderRadius: '50%' },
+  // Week view
+  weekWrap: { display: 'flex', flexDirection: 'column', flex: 1, overflowY: 'auto' },
+  weekHeaderRow: { display: 'grid', gridTemplateColumns: '64px repeat(7, 1fr)', gap: '4px', marginBottom: '6px', position: 'sticky', top: 0, background: 'var(--panel-bg)', zIndex: 2, paddingBottom: '6px', borderBottom: '1px solid var(--border-color)' },
+  timeColHeader: {},
+  weekDayHeader: { textAlign: 'center', padding: '6px 4px', fontFamily: 'var(--font-body)' },
+  weekDayName: { fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em' },
+  weekDayNum: { fontSize: '1.1rem', marginTop: '2px' },
+  weekGrid: { display: 'flex', flexDirection: 'column' },
+  weekHourRow: { display: 'grid', gridTemplateColumns: '64px repeat(7, 1fr)', gap: '4px', borderBottom: '1px solid rgba(255,255,255,0.04)', minHeight: '40px' },
+  timeColLabel: { fontSize: '0.7rem', color: 'var(--text-muted)', padding: '4px 8px 0 0', textAlign: 'right', fontFamily: 'var(--font-body)' },
+  weekHourCell: { display: 'flex', flexDirection: 'column', gap: '2px', padding: '2px', minHeight: '38px', borderLeft: '1px solid rgba(255,255,255,0.04)' },
+  weekChip: { display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(255,255,255,0.04)', borderLeft: '2px solid', border: '1px solid var(--border-color)', borderLeftWidth: '2px', borderRadius: '4px', padding: '3px 6px', cursor: 'pointer', textAlign: 'left', overflow: 'hidden', minHeight: '22px' },
+  weekChipTime: { fontSize: '0.62rem', color: 'var(--text-muted)', fontFamily: 'var(--font-body)', flexShrink: 0 },
+  weekChipText: { fontSize: '0.7rem', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-body)' },
   // Detail popover
   detailOverlay: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)', borderRadius: '16px' },
   detailCard: { background: 'var(--panel-bg)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '20px', width: '90%', maxWidth: '440px', boxShadow: '0 12px 32px rgba(0,0,0,0.6)' },
