@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { flushSync } from 'react-dom';
 import InputPanel from './components/InputPanel';
 import PlatformSelector from './components/PlatformSelector';
 import OutputGrid from './components/OutputGrid';
@@ -32,20 +33,6 @@ export default function App() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState(loadHistory);
 
-  const streamingRef = useRef({});
-  const rafRef = useRef(null);
-
-  useEffect(() => {
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, []);
-
-  const scheduleStreamUpdate = useCallback(() => {
-    if (rafRef.current) return;
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null;
-      setOutputs(prev => ({ ...prev, ...streamingRef.current }));
-    });
-  }, []);
 
   const togglePlatform = (id) => {
     setSelectedPlatforms(prev =>
@@ -106,8 +93,6 @@ export default function App() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
 
-      streamingRef.current[platformId] = '';
-
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -122,15 +107,17 @@ export default function App() {
             const text = parsed?.choices?.[0]?.delta?.content || '';
             if (text) {
               fullText += text;
-              streamingRef.current[platformId] = fullText;
-              scheduleStreamUpdate();
+              // Force React to paint this token, then yield to the browser
+              flushSync(() => {
+                setOutputs(prev => ({ ...prev, [platformId]: fullText }));
+              });
+              await new Promise(resolve => requestAnimationFrame(resolve));
             }
           }
         }
       }
 
-      // Always commit the final complete text, regardless of RAF timing
-      delete streamingRef.current[platformId];
+      // Final commit to ensure the complete text is in state
       setOutputs(prev => ({ ...prev, [platformId]: fullText }));
 
       return fullText;
