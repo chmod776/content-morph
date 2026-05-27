@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Copy, Check, RotateCcw, AlertCircle } from 'lucide-react';
+import { Copy, Check, RotateCcw, AlertCircle, Send } from 'lucide-react';
 import { platforms } from '../platforms';
 
-export default function OutputCard({ platformId, output, loading, error, onRetry }) {
+export default function OutputCard({ platformId, output, loading, error, onRetry, onPublish }) {
   const [copied, setCopied] = useState(false);
   const platform = platforms[platformId];
 
@@ -12,6 +12,8 @@ export default function OutputCard({ platformId, output, loading, error, onRetry
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const canPublish = !!output && !loading && !error;
 
   return (
     <div style={{ ...styles.card, borderLeftColor: platform.color }}>
@@ -69,6 +71,26 @@ export default function OutputCard({ platformId, output, loading, error, onRetry
           </div>
         )}
       </div>
+
+      {canPublish && (
+        <div style={styles.footer}>
+          <button
+            style={{ ...styles.publishBtn, borderColor: platform.color, color: platform.color }}
+            onClick={onPublish}
+            onMouseEnter={e => {
+              e.currentTarget.style.backgroundColor = platform.color;
+              e.currentTarget.style.color = '#fff';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = platform.color;
+            }}
+          >
+            <Send size={13} style={{ marginRight: '6px' }} />
+            Publish
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -156,6 +178,27 @@ const styles = {
     color: 'var(--text-muted)',
     fontStyle: 'italic',
     fontSize: '1.15rem'
+  },
+  footer: {
+    padding: '12px 32px',
+    borderTop: '1px solid var(--border-color)',
+    display: 'flex',
+    justifyContent: 'flex-end',
+    flexShrink: 0,
+  },
+  publishBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderRadius: '6px',
+    padding: '7px 16px',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    fontFamily: 'var(--font-body)',
+    cursor: 'pointer',
+    transition: 'background-color 0.15s, color 0.15s',
   },
   errorContainer: {
     height: '100%',

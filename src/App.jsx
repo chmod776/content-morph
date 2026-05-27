@@ -5,6 +5,8 @@ import PlatformSelector from './components/PlatformSelector';
 import OutputGrid from './components/OutputGrid';
 import SettingsPanel from './components/SettingsPanel';
 import HistoryPanel from './components/HistoryPanel';
+import PublishModal from './components/PublishModal';
+import SchedulePanel from './components/SchedulePanel';
 import { platforms } from './platforms';
 import { useSettings } from './context/SettingsContext';
 
@@ -20,6 +22,16 @@ function saveHistory(h) {
   localStorage.setItem('contentmorph-history', JSON.stringify(h));
 }
 
+function loadScheduled() {
+  try {
+    return JSON.parse(localStorage.getItem('contentmorph-scheduled') || '[]');
+  } catch { return []; }
+}
+
+function saveScheduled(posts) {
+  localStorage.setItem('contentmorph-scheduled', JSON.stringify(posts));
+}
+
 export default function App() {
   const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
   const { settings } = useSettings();
@@ -31,7 +43,10 @@ export default function App() {
   const [errors, setErrors] = useState({});
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [publishModal, setPublishModal] = useState(null);
   const [history, setHistory] = useState(loadHistory);
+  const [scheduledPosts, setScheduledPosts] = useState(loadScheduled);
 
 
   const togglePlatform = (id) => {
@@ -201,20 +216,57 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  const handlePublishAll = () => {
-    const readyOutputs = selectedPlatforms
-      .filter(id => outputs[id] && !loadingStates[id])
-      .map(id => `=== ${platforms[id].name} ===\n\n${outputs[id]}`)
-      .join('\n\n\n');
-    if (!readyOutputs) return;
-    const blob = new Blob([readyOutputs], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'content-morph-all-platforms.txt';
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleOpenPublish = (platformId) => {
+    const content = outputs[platformId];
+    if (!content) return;
+    setPublishModal({ posts: [{ platformId, content }] });
   };
+
+  const handleOpenPublishAll = () => {
+    const posts = selectedPlatforms
+      .filter(id => outputs[id] && !loadingStates[id])
+      .map(id => ({ platformId: id, content: outputs[id] }));
+    if (posts.length === 0) return;
+    setPublishModal({ posts });
+  };
+
+  const handlePublishNow = (_editedPosts) => {
+    // Post Now: modal handles success state, nothing extra needed
+  };
+
+  const handleSchedule = (editedPosts, scheduledAt) => {
+    const newEntries = editedPosts.map(p => ({
+      id: Date.now() + Math.random(),
+      platformId: p.platformId,
+      content: p.content,
+      scheduledAt,
+    }));
+    setScheduledPosts(prev => {
+      const next = [...prev, ...newEntries];
+      saveScheduled(next);
+      return next;
+    });
+  };
+
+  const handleCancelScheduled = (id) => {
+    setScheduledPosts(prev => {
+      const next = prev.filter(p => p.id !== id);
+      saveScheduled(next);
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setScheduledPosts(prev => {
+        const remaining = prev.filter(p => p.scheduledAt > now);
+        if (remaining.length !== prev.length) saveScheduled(remaining);
+        return remaining;
+      });
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const isGenerating = Object.values(loadingStates).some(state => state);
 
@@ -230,6 +282,8 @@ export default function App() {
           onSettingsOpen={() => setSettingsOpen(true)}
           onHistoryOpen={() => setHistoryOpen(true)}
           historyCount={history.length}
+          onScheduleOpen={() => setScheduleOpen(true)}
+          scheduledCount={scheduledPosts.length}
         />
         <PlatformSelector
           selectedPlatforms={selectedPlatforms}
@@ -242,7 +296,8 @@ export default function App() {
           loadingStates={loadingStates}
           errors={errors}
           onRetry={(platformId) => generateForPlatform(platformId, input)}
-          onPublishAll={handlePublishAll}
+          onPublishAll={handleOpenPublishAll}
+          onPublish={handleOpenPublish}
         />
       </main>
 
@@ -255,6 +310,20 @@ export default function App() {
         onDelete={handleHistoryDelete}
         onClear={handleHistoryClear}
       />
+      <SchedulePanel
+        isOpen={scheduleOpen}
+        scheduledPosts={scheduledPosts}
+        onCancel={handleCancelScheduled}
+        onClose={() => setScheduleOpen(false)}
+      />
+      {publishModal && (
+        <PublishModal
+          posts={publishModal.posts}
+          onClose={() => setPublishModal(null)}
+          onPublishNow={handlePublishNow}
+          onSchedule={handleSchedule}
+        />
+      )}
     </div>
   );
 }

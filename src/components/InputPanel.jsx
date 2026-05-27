@@ -1,7 +1,7 @@
 import React from 'react';
 import { Send, Save, Link, Calendar, History, Settings, User } from 'lucide-react';
 
-export default function InputPanel({ input, setInput, isGenerating, onGenerate, onSave, onSettingsOpen, onHistoryOpen, historyCount }) {
+export default function InputPanel({ input, setInput, isGenerating, onGenerate, onSave, onSettingsOpen, onHistoryOpen, historyCount, onScheduleOpen, scheduledCount }) {
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -14,8 +14,11 @@ export default function InputPanel({ input, setInput, isGenerating, onGenerate, 
           <button style={styles.iconBtn} title="Share link">
             <Link size={16} />
           </button>
-          <button style={styles.iconBtn} title="Calendar">
+          <button style={{ ...styles.iconBtn, position: 'relative' }} title="Scheduled posts" onClick={onScheduleOpen}>
             <Calendar size={16} />
+            {scheduledCount > 0 && (
+              <span style={styles.historyBadge}>{scheduledCount > 9 ? '9+' : scheduledCount}</span>
+            )}
           </button>
           <button style={{ ...styles.iconBtn, position: 'relative' }} title="History" onClick={onHistoryOpen}>
             <History size={16} />

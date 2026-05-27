@@ -2,7 +2,7 @@ import React from 'react';
 import { Send } from 'lucide-react';
 import OutputCard from './OutputCard';
 
-export default function OutputGrid({ selectedPlatforms, outputs, loadingStates, errors, onRetry, onPublishAll }) {
+export default function OutputGrid({ selectedPlatforms, outputs, loadingStates, errors, onRetry, onPublishAll, onPublish }) {
   if (selectedPlatforms.length === 0) {
     return (
       <div style={styles.emptyState}>
@@ -24,7 +24,7 @@ export default function OutputGrid({ selectedPlatforms, outputs, loadingStates, 
             title={`Publish to all ${readyCount} ready platforms`}
           >
             <Send size={14} style={{ marginRight: '7px' }} />
-            Publish to all ({readyCount})
+            Publish all ({readyCount})
           </button>
         )}
       </div>
@@ -37,6 +37,7 @@ export default function OutputGrid({ selectedPlatforms, outputs, loadingStates, 
             loading={loadingStates[platformId] || false}
             error={errors[platformId] || null}
             onRetry={() => onRetry(platformId)}
+            onPublish={() => onPublish(platformId)}
           />
         ))}
       </div>
