@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { flushSync } from 'react-dom';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import InputPanel from './components/InputPanel';
 import PlatformSelector from './components/PlatformSelector';
 import OutputGrid from './components/OutputGrid';
@@ -32,6 +31,21 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState(loadHistory);
+
+  const streamingRef = useRef({});
+  const rafRef = useRef(null);
+
+  useEffect(() => {
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, []);
+
+  const scheduleStreamUpdate = useCallback(() => {
+    if (rafRef.current) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      setOutputs(prev => ({ ...prev, ...streamingRef.current }));
+    });
+  }, []);
 
   const togglePlatform = (id) => {
     setSelectedPlatforms(prev =>
@@ -95,6 +109,8 @@ export default function App() {
         const reader = response.body.getReader();
         const decoder = new TextDecoder('utf-8');
 
+        streamingRef.current[platformId] = '';
+
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -104,24 +120,19 @@ export default function App() {
 
           for (const line of lines) {
             if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-              try {
-                const data = JSON.parse(line.trim().slice(6));
-                const text = data.choices[0]?.delta?.content || '';
-                if (text) {
-                  fullText += text;
-                  flushSync(() => {
-                    setOutputs(prev => ({
-                      ...prev,
-                      [platformId]: (prev[platformId] || '') + text
-                    }));
-                  });
-                }
-              } catch (e) {
-                // Ignore parse errors from incomplete streamed lines
+              let parsed = null;
+              try { parsed = JSON.parse(line.trim().slice(6)); } catch (e) { continue; }
+              const text = parsed?.choices?.[0]?.delta?.content || '';
+              if (text) {
+                fullText += text;
+                streamingRef.current[platformId] = (streamingRef.current[platformId] || '') + text;
+                scheduleStreamUpdate();
               }
             }
           }
         }
+
+        delete streamingRef.current[platformId];
       } else {
         const data = await response.json();
         fullText = data.choices[0]?.message?.content || '';
