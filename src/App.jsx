@@ -57,6 +57,8 @@ export default function App() {
       prompt += '\n\nLength instruction: Write a longer, more detailed and expansive version than you normally would.';
     }
 
+    prompt += '\n\nQUALITY RULE: Your output must have perfect spelling and grammar. Never invent or merge words. Every sentence must be grammatically complete — never start a sentence with a comma, conjunction fragment, or mid-thought. Proofread before outputting.';
+
     return prompt;
   };
 
