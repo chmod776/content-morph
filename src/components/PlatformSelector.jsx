@@ -17,7 +17,7 @@ export default function PlatformSelector({ selectedPlatforms, togglePlatform, is
                 ...styles.button,
                 borderColor: isSelected ? platform.color : 'var(--border-color)',
                 backgroundColor: isSelected ? platform.color : 'transparent',
-                color: isSelected ? '#0d0d0d' : 'var(--text-main)',
+                color: isSelected ? (platform.id === 'twitter' ? '#ffffff' : '#0d0d0d') : 'var(--text-main)',
                 opacity: isGenerating ? 0.6 : 1,
                 cursor: isGenerating ? 'not-allowed' : 'pointer',
                 transform: 'scale(1)'
