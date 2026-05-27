@@ -164,7 +164,7 @@ export default function SettingsPanel({ isOpen, onClose }) {
                       ...styles.platformChip,
                       borderColor: active ? p.color : 'var(--border-color)',
                       backgroundColor: active ? p.color : 'transparent',
-                      color: active ? '#0d0d0d' : 'var(--text-muted)',
+                      color: active ? (p.id === 'twitter' ? '#ffffff' : '#0d0d0d') : 'var(--text-muted)',
                     }}
                     onClick={() => togglePlatformDefault(p.id)}
                   >
@@ -372,6 +372,8 @@ const styles = {
     fontSize: '0.92rem',
     transition: 'all 0.15s',
     textAlign: 'left',
+    gap: '16px',
+    whiteSpace: 'nowrap',
   },
   platformChip: {
     padding: '8px 16px',
