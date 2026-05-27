@@ -23,3 +23,12 @@ NEW: Users want to connect their social accounts and post (now or scheduled) dir
 - Retry policy for failed scheduled posts
 - Per-platform character/format validation in the review step
 - Post history view
+
+## Update (Feb 2026 - session 3)
+- Twitter OAuth credentials configured: live posting now active for Twitter
+- Batch publish presets feature added:
+  - Save reusable batch configs ("Morning blast", "Daily 9am", etc.)
+  - Two schedule types: relative offsets (mins from load) OR fixed clock times (HH:MM)
+  - Backend endpoints: GET/POST/DELETE /api/social/presets
+  - Frontend: preset chips in BatchPublishModal with save panel + per-platform time computation on load
+- Test status: 8/8 backend preset endpoint tests passed

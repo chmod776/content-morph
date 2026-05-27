@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Send, Calendar, CheckCircle2, AlertCircle, Loader, Link2, SkipForward } from 'lucide-react';
+import { X, Send, Calendar, CheckCircle2, AlertCircle, Loader, Link2, SkipForward, BookmarkPlus, Bookmark, Trash2 } from 'lucide-react';
 import { platforms } from '../platforms';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -24,6 +24,12 @@ export default function BatchPublishModal({ session, outputs, selectedPlatforms,
   const [submitting, setSubmitting] = useState(false);
   const [confirmStep, setConfirmStep] = useState(false);
   const [results, setResults] = useState({});  // platform -> {success, message}
+
+  // ---- Presets state ----
+  const [presets, setPresets] = useState([]);
+  const [showSavePreset, setShowSavePreset] = useState(false);
+  const [presetName, setPresetName] = useState('');
+  const [presetScheduleType, setPresetScheduleType] = useState('offset'); // 'offset' | 'fixed'
 
   const authHeader = useCallback(() => ({
     'Authorization': `Bearer ${session?.access_token || ''}`,
@@ -105,6 +111,94 @@ export default function BatchPublishModal({ session, outputs, selectedPlatforms,
 
         {accounts !== null && (
           <>
+            {/* Presets bar */}
+            <div style={styles.presetsBar}>
+              <div style={styles.presetsLeft}>
+                <Bookmark size={14} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
+                {presets.length === 0 ? (
+                  <span style={styles.presetsEmpty}>No saved presets yet</span>
+                ) : (
+                  <div style={styles.presetChips}>
+                    {presets.map(p => (
+                      <button
+                        key={p.id}
+                        style={styles.presetChip}
+                        onClick={() => loadPreset(p)}
+                        title={`Load preset: ${p.name}`}
+                        data-testid={`preset-load-${p.id}`}
+                      >
+                        <span>{p.name}</span>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          style={styles.presetChipDelete}
+                          onClick={(e) => { e.stopPropagation(); deletePreset(p.id); }}
+                          data-testid={`preset-delete-${p.id}`}
+                        >
+                          <Trash2 size={11} />
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {!showSavePreset && !confirmStep && (
+                <button
+                  style={styles.savePresetBtn}
+                  onClick={() => setShowSavePreset(true)}
+                  disabled={submitting}
+                  data-testid="open-save-preset"
+                >
+                  <BookmarkPlus size={13} style={{ marginRight: 5 }} /> Save as preset
+                </button>
+              )}
+            </div>
+
+            {showSavePreset && (
+              <div style={styles.savePresetPanel} data-testid="save-preset-panel">
+                <input
+                  type="text"
+                  placeholder='Preset name (e.g. "Morning blast")'
+                  value={presetName}
+                  onChange={(e) => setPresetName(e.target.value)}
+                  style={styles.presetNameInput}
+                  autoFocus
+                  data-testid="preset-name-input"
+                />
+                {mode === 'schedule' && (
+                  <div style={styles.presetTypeRow}>
+                    <label style={styles.presetTypeOption}>
+                      <input
+                        type="radio"
+                        checked={presetScheduleType === 'offset'}
+                        onChange={() => setPresetScheduleType('offset')}
+                        data-testid="preset-type-offset"
+                      />
+                      <span>Relative offsets (e.g. +30 min from load)</span>
+                    </label>
+                    <label style={styles.presetTypeOption}>
+                      <input
+                        type="radio"
+                        checked={presetScheduleType === 'fixed'}
+                        onChange={() => setPresetScheduleType('fixed')}
+                        data-testid="preset-type-fixed"
+                      />
+                      <span>Fixed clock time (e.g. 9:00 AM daily)</span>
+                    </label>
+                  </div>
+                )}
+                <div style={styles.savePresetActions}>
+                  <button style={styles.cancelBtn} onClick={() => { setShowSavePreset(false); setPresetName(''); }}>Cancel</button>
+                  <button
+                    style={{ ...styles.primaryBtn, opacity: presetName.trim() ? 1 : 0.5 }}
+                    onClick={savePreset}
+                    disabled={!presetName.trim()}
+                    data-testid="confirm-save-preset"
+                  >Save preset</button>
+                </div>
+              </div>
+            )}
+
             <div style={styles.cardList}>
               {initialPlatforms.map(p => {
                 const meta = platforms[p];
@@ -360,6 +454,18 @@ const styles = {
   applyAllRow: { display: 'flex', gap: '8px' },
   applyAllBtn: { background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', padding: '0 16px', borderRadius: '8px', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: '0.88rem', whiteSpace: 'nowrap' },
   helpText: { margin: '4px 0 0 0', fontSize: '0.76rem', color: 'var(--text-muted)' },
+  presetsBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '10px 12px', backgroundColor: 'rgba(255,255,255,0.025)', borderRadius: '8px', marginBottom: '16px', flexWrap: 'wrap' },
+  presetsLeft: { display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 },
+  presetsEmpty: { fontSize: '0.82rem', color: 'var(--text-muted)', fontStyle: 'italic' },
+  presetChips: { display: 'flex', gap: '6px', flexWrap: 'wrap' },
+  presetChip: { display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: 'var(--text-main)', padding: '4px 8px 4px 10px', borderRadius: '16px', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: '0.82rem' },
+  presetChipDelete: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px', borderRadius: '50%' },
+  savePresetBtn: { display: 'inline-flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: '0.82rem' },
+  savePresetPanel: { display: 'flex', flexDirection: 'column', gap: '10px', padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', marginBottom: '16px', background: 'rgba(0,0,0,0.2)' },
+  presetNameInput: { backgroundColor: '#1a1a1a', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px 12px', fontSize: '0.95rem', fontFamily: 'var(--font-body)', outline: 'none' },
+  presetTypeRow: { display: 'flex', flexDirection: 'column', gap: '6px' },
+  presetTypeOption: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: 'var(--text-main)', cursor: 'pointer' },
+  savePresetActions: { display: 'flex', justifyContent: 'flex-end', gap: '10px' },
   summaryRow: { display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' },
   summaryText: { fontSize: '0.85rem', color: 'var(--text-muted)' },
   footer: { display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' },

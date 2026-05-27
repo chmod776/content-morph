@@ -60,6 +60,23 @@ class ScheduleRequest(BaseModel):
 class DemoConnectRequest(BaseModel):
     platform: str
 
+class BatchPreset(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    name: str
+    mode: str = "schedule"  # "now" | "schedule"
+    schedule_type: str = "offset"  # "offset" (minutes from load time) | "fixed" (clock time HH:MM in user's local tz)
+    # platform_times: { "twitter": 0, "linkedin": 30 } for offset mode (minutes)
+    # platform_times: { "twitter": "09:00", "linkedin": "12:30" } for fixed mode
+    platform_times: dict = Field(default_factory=dict)
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+class BatchPresetCreate(BaseModel):
+    name: str
+    mode: str = "schedule"
+    schedule_type: str = "offset"
+    platform_times: dict
+
 # ---------- Auth helper ----------
 def get_user_id(authorization: Optional[str] = Header(None)) -> str:
     if not authorization or not authorization.startswith('Bearer '):
@@ -366,6 +383,33 @@ async def cancel_scheduled(post_id: str, user_id: str = Depends(get_user_id)):
         {"$set": {"status": "cancelled"}}
     )
     return {"cancelled": res.modified_count}
+
+# ---------- Batch Presets ----------
+@api_router.get("/social/presets")
+async def list_presets(user_id: str = Depends(get_user_id)):
+    presets = await db.batch_presets.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return {"presets": presets}
+
+@api_router.post("/social/presets")
+async def create_preset(req: BatchPresetCreate, user_id: str = Depends(get_user_id)):
+    if not req.name.strip():
+        raise HTTPException(400, "Preset name is required")
+    if req.mode not in ("now", "schedule"):
+        raise HTTPException(400, "mode must be 'now' or 'schedule'")
+    if req.schedule_type not in ("offset", "fixed"):
+        raise HTTPException(400, "schedule_type must be 'offset' or 'fixed'")
+    preset = BatchPreset(
+        user_id=user_id, name=req.name.strip(),
+        mode=req.mode, schedule_type=req.schedule_type,
+        platform_times=req.platform_times or {}
+    )
+    await db.batch_presets.insert_one(preset.model_dump())
+    return preset.model_dump()
+
+@api_router.delete("/social/presets/{preset_id}")
+async def delete_preset(preset_id: str, user_id: str = Depends(get_user_id)):
+    res = await db.batch_presets.delete_one({"id": preset_id, "user_id": user_id})
+    return {"deleted": res.deleted_count}
 
 # ---------- Scheduler worker ----------
 async def process_due_posts():
