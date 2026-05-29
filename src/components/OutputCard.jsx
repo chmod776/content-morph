@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Copy, Check, RotateCcw, AlertCircle, Send } from 'lucide-react';
 import { platforms } from '../platforms';
 import { useTranslation } from '../hooks/useTranslation';
@@ -16,6 +16,24 @@ export default function OutputCard({ platformId, output, loading, error, onRetry
   };
 
   const canPublish = !!output && !loading && !error;
+
+  const charInfo = useMemo(() => {
+    if (!output || !platform.charLimit) return null;
+    if (platform.isThread) {
+      const tweets = output.split(/\n\n+/).map(t => t.trim()).filter(t => t.length > 0);
+      const maxLen = Math.max(...tweets.map(tw => tw.length));
+      const overLimit = tweets.some(tw => tw.length > platform.charLimit);
+      return { isThread: true, tweetCount: tweets.length, maxLen, overLimit, limit: platform.charLimit };
+    }
+    const len = output.length;
+    const pct = len / platform.charLimit;
+    return { isThread: false, len, limit: platform.charLimit, overLimit: pct > 1, warn: pct >= 0.8 };
+  }, [output, platform]);
+
+  const charColor = !charInfo ? 'var(--text-muted)'
+    : charInfo.overLimit ? '#dc2626'
+    : (!charInfo.isThread && charInfo.warn) ? '#d97706'
+    : 'var(--text-muted)';
 
   return (
     <div style={{ ...styles.card, borderLeftColor: platform.color }}>
@@ -86,6 +104,15 @@ export default function OutputCard({ platformId, output, loading, error, onRetry
             <RotateCcw size={13} style={{ marginRight: '6px' }} />
             {t.regenerate}
           </button>
+
+          {charInfo && (
+            <span style={{ ...styles.charCounter, color: charColor }}>
+              {charInfo.isThread
+                ? `${charInfo.tweetCount} tweets · max ${charInfo.maxLen}/${charInfo.limit}`
+                : `${charInfo.len} / ${charInfo.limit}`}
+            </span>
+          )}
+
           <button
             style={{ ...styles.publishBtn, borderColor: platform.color, color: platform.color }}
             onClick={onPublish}
@@ -233,6 +260,12 @@ const styles = {
     fontFamily: 'var(--font-body)',
     cursor: 'pointer',
     transition: 'background-color 0.15s',
+  },
+  charCounter: {
+    fontSize: '0.75rem',
+    fontFamily: 'var(--font-body)',
+    fontWeight: '500',
+    whiteSpace: 'nowrap',
   },
   publishBtn: {
     display: 'flex',
