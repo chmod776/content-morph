@@ -75,6 +75,16 @@ export default function OutputCard({ platformId, output, loading, error, onRetry
       {canPublish && (
         <div style={styles.footer}>
           <button
+            style={styles.regenBtn}
+            onClick={onRetry}
+            title="Regenerate this platform"
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--border-color)'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+          >
+            <RotateCcw size={13} style={{ marginRight: '6px' }} />
+            Regenerate
+          </button>
+          <button
             style={{ ...styles.publishBtn, borderColor: platform.color, color: platform.color }}
             onClick={onPublish}
             onMouseEnter={e => {
@@ -183,8 +193,25 @@ const styles = {
     padding: '12px 32px',
     borderTop: '1px solid var(--border-color)',
     display: 'flex',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     flexShrink: 0,
+  },
+  regenBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    color: 'var(--text-muted)',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: 'var(--border-color)',
+    borderRadius: '6px',
+    padding: '7px 14px',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    fontFamily: 'var(--font-body)',
+    cursor: 'pointer',
+    transition: 'background-color 0.15s',
   },
   publishBtn: {
     display: 'flex',
