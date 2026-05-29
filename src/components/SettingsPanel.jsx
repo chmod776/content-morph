@@ -6,6 +6,19 @@ import { useTranslation } from '../hooks/useTranslation';
 
 const languages = ['English', 'Spanish', 'French', 'German', 'Portuguese', 'Italian', 'Dutch', 'Japanese', 'Korean', 'Mandarin'];
 
+const nativeLanguageNames = {
+  English: 'English',
+  Spanish: 'Español',
+  French: 'Français',
+  German: 'Deutsch',
+  Portuguese: 'Português',
+  Italian: 'Italiano',
+  Dutch: 'Nederlands',
+  Japanese: '日本語',
+  Korean: '한국어',
+  Mandarin: '中文',
+};
+
 export default function SettingsPanel({ isOpen, onClose }) {
   const { settings, updateSetting } = useSettings();
   const t = useTranslation();
@@ -153,7 +166,7 @@ export default function SettingsPanel({ isOpen, onClose }) {
                   }}
                   onClick={() => updateSetting('outputLanguage', lang)}
                 >
-                  {lang}
+                  {nativeLanguageNames[lang]}
                 </button>
               ))}
             </div>
