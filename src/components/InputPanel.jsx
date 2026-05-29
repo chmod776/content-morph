@@ -1,7 +1,10 @@
 import React from 'react';
 import { Send, Save, Link, Calendar, History, Settings, User } from 'lucide-react';
+import { useTranslation } from '../hooks/useTranslation';
 
 export default function InputPanel({ input, setInput, isGenerating, onGenerate, onSave, onSettingsOpen, onHistoryOpen, historyCount, onScheduleOpen, scheduledCount }) {
+  const t = useTranslation();
+
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -11,33 +14,33 @@ export default function InputPanel({ input, setInput, isGenerating, onGenerate, 
             <User size={13} style={{ marginRight: '5px' }} />
             <span style={styles.userName}>calebmamol</span>
           </div>
-          <button style={styles.iconBtn} title="Share link">
+          <button style={styles.iconBtn} title={t.shareLink}>
             <Link size={16} />
           </button>
-          <button style={{ ...styles.iconBtn, position: 'relative' }} title="Scheduled posts" onClick={onScheduleOpen}>
+          <button style={{ ...styles.iconBtn, position: 'relative' }} title={t.scheduledPosts} onClick={onScheduleOpen}>
             <Calendar size={16} />
             {scheduledCount > 0 && (
               <span style={styles.historyBadge}>{scheduledCount > 9 ? '9+' : scheduledCount}</span>
             )}
           </button>
-          <button style={{ ...styles.iconBtn, position: 'relative' }} title="History" onClick={onHistoryOpen}>
+          <button style={{ ...styles.iconBtn, position: 'relative' }} title={t.history} onClick={onHistoryOpen}>
             <History size={16} />
             {historyCount > 0 && (
               <span style={styles.historyBadge}>{historyCount > 9 ? '9+' : historyCount}</span>
             )}
           </button>
-          <button style={styles.iconBtn} title="Settings" onClick={onSettingsOpen}>
+          <button style={styles.iconBtn} title={t.settings} onClick={onSettingsOpen}>
             <Settings size={16} />
           </button>
         </div>
       </div>
       
-      <p style={styles.subtitle}>Transform your raw notes into platform-ready posts.</p>
+      <p style={styles.subtitle}>{t.subtitle}</p>
       
       <div style={styles.inputWrapper}>
         <textarea
           style={styles.textarea}
-          placeholder="Paste your raw content, idea, or notes here..."
+          placeholder={t.placeholder}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={isGenerating}
@@ -51,7 +54,7 @@ export default function InputPanel({ input, setInput, isGenerating, onGenerate, 
           }}
         />
         <div style={styles.footer}>
-          <span style={styles.charCount}>{input.length} characters</span>
+          <span style={styles.charCount}>{input.length} {t.characters}</span>
           
           <button
             style={{
@@ -61,10 +64,10 @@ export default function InputPanel({ input, setInput, isGenerating, onGenerate, 
             }}
             onClick={onSave}
             disabled={!input.trim()}
-            title="Save content"
+            title={t.save}
           >
             <Save size={15} style={{ marginRight: '6px' }} />
-            Save
+            {t.save}
           </button>
 
           <button 
@@ -86,7 +89,7 @@ export default function InputPanel({ input, setInput, isGenerating, onGenerate, 
             onClick={onGenerate}
             disabled={!input.trim() || isGenerating}
           >
-            {isGenerating ? 'Morphing...' : 'Transform'}
+            {isGenerating ? t.morphing : t.transform}
             <Send size={16} style={{ marginLeft: '8px' }} />
           </button>
         </div>

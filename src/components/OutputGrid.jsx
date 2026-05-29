@@ -1,12 +1,15 @@
 import React from 'react';
 import { Send } from 'lucide-react';
 import OutputCard from './OutputCard';
+import { useTranslation } from '../hooks/useTranslation';
 
 export default function OutputGrid({ selectedPlatforms, outputs, loadingStates, errors, onRetry, onPublishAll, onPublish }) {
+  const t = useTranslation();
+
   if (selectedPlatforms.length === 0) {
     return (
       <div style={styles.emptyState}>
-        <p>Select at least one platform to see outputs.</p>
+        <p>{t.noPlatforms}</p>
       </div>
     );
   }
@@ -16,15 +19,15 @@ export default function OutputGrid({ selectedPlatforms, outputs, loadingStates, 
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <h3 style={styles.title}>Results</h3>
+        <h3 style={styles.title}>{t.results}</h3>
         {readyCount > 0 && (
           <button
             style={styles.publishBtn}
             onClick={onPublishAll}
-            title={`Publish to all ${readyCount} ready platforms`}
+            title={t.publishAll(readyCount)}
           >
             <Send size={14} style={{ marginRight: '7px' }} />
-            Publish all ({readyCount})
+            {t.publishAll(readyCount)}
           </button>
         )}
       </div>

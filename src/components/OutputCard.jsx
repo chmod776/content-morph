@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Copy, Check, RotateCcw, AlertCircle, Send } from 'lucide-react';
 import { platforms } from '../platforms';
+import { useTranslation } from '../hooks/useTranslation';
 
 export default function OutputCard({ platformId, output, loading, error, onRetry, onPublish }) {
   const [copied, setCopied] = useState(false);
   const platform = platforms[platformId];
+  const t = useTranslation();
 
   const handleCopy = () => {
     if (!output) return;
@@ -25,7 +27,7 @@ export default function OutputCard({ platformId, output, loading, error, onRetry
           style={styles.actionBtn}
           onClick={handleCopy}
           disabled={!output || loading}
-          title="Copy to clipboard"
+          title={t.copyToClipboard}
           onMouseEnter={(e) => {
             if (output && !loading) e.currentTarget.style.opacity = '0.7';
           }}
@@ -50,10 +52,10 @@ export default function OutputCard({ platformId, output, loading, error, onRetry
         {error && (
           <div style={styles.errorContainer}>
             <AlertCircle size={20} color="var(--accent-red)" style={{ marginBottom: '8px' }} />
-            <p style={styles.errorText}>Generation failed</p>
+            <p style={styles.errorText}>{t.generationFailed}</p>
             <button style={styles.retryBtn} onClick={onRetry}>
               <RotateCcw size={14} style={{ marginRight: '6px' }} />
-              Retry
+              {t.retry}
             </button>
           </div>
         )}
@@ -67,7 +69,7 @@ export default function OutputCard({ platformId, output, loading, error, onRetry
 
         {!loading && !output && !error && (
           <div style={styles.emptyState}>
-            Ready to generate
+            {t.readyToGenerate}
           </div>
         )}
       </div>
@@ -77,12 +79,12 @@ export default function OutputCard({ platformId, output, loading, error, onRetry
           <button
             style={styles.regenBtn}
             onClick={onRetry}
-            title="Regenerate this platform"
+            title={t.regeneratePlatform}
             onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--border-color)'}
             onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
           >
             <RotateCcw size={13} style={{ marginRight: '6px' }} />
-            Regenerate
+            {t.regenerate}
           </button>
           <button
             style={{ ...styles.publishBtn, borderColor: platform.color, color: platform.color }}
@@ -97,7 +99,7 @@ export default function OutputCard({ platformId, output, loading, error, onRetry
             }}
           >
             <Send size={13} style={{ marginRight: '6px' }} />
-            Publish
+            {t.publish}
           </button>
         </div>
       )}
@@ -108,83 +110,102 @@ export default function OutputCard({ platformId, output, loading, error, onRetry
 const styles = {
   card: {
     backgroundColor: 'var(--panel-bg)',
-    border: 'none',
-    borderLeft: '2px solid',
+    border: '1px solid var(--border-color)',
+    borderLeft: '3px solid',
     borderRadius: '12px',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    height: '420px',
-    boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+    minHeight: '260px',
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '24px 32px',
+    padding: '20px 32px 16px',
     borderBottom: '1px solid var(--border-color)',
-    backgroundColor: 'rgba(0,0,0,0.2)'
+    flexShrink: 0,
   },
   brand: {
     display: 'flex',
-    alignItems: 'center'
+    alignItems: 'center',
+    gap: '10px',
   },
   title: {
     margin: 0,
-    fontSize: '1.35rem',
-    fontWeight: '600',
+    fontSize: '1.1rem',
+    fontWeight: '700',
     fontFamily: 'var(--font-aesthetic)',
-    letterSpacing: '-0.02em'
   },
   actionBtn: {
     background: 'transparent',
     border: 'none',
-    color: 'var(--text-muted)',
     cursor: 'pointer',
-    padding: '6px',
-    borderRadius: '6px',
+    padding: '4px',
     display: 'flex',
-    transition: 'background-color 0.2s, color 0.2s'
+    borderRadius: '4px',
+    transition: 'opacity 0.15s',
   },
   content: {
-    padding: '32px',
     flex: 1,
+    padding: '24px 32px',
     overflowY: 'auto',
-    position: 'relative'
-  },
-  textContent: {
-    whiteSpace: 'pre-wrap',
-    lineHeight: '1.7',
-    fontSize: '1.15rem',
-    fontFamily: 'var(--font-body)',
-    color: 'var(--text-main)'
-  },
-  cursor: {
-    display: 'inline-block',
-    width: '8px',
-    height: '16px',
-    backgroundColor: 'var(--text-main)',
-    marginLeft: '4px',
-    animation: 'blink 1s step-end infinite',
-    verticalAlign: 'middle'
   },
   skeletonContainer: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '14px',
-    padding: '8px 0'
+    gap: '10px',
   },
   skeletonLine: {
-    height: '14px',
+    height: '16px',
     backgroundColor: 'var(--border-color)',
     borderRadius: '4px',
-    animation: 'pulse 1.5s infinite ease-in-out'
+    animation: 'pulse 1.5s ease-in-out infinite',
   },
-  emptyState: {
-    height: '100%',
+  errorContainer: {
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
+    height: '100%',
+    gap: '4px',
+    textAlign: 'center',
+  },
+  errorText: {
+    margin: '0 0 8px',
+    color: 'var(--accent-red)',
+    fontSize: '0.9rem',
+    fontWeight: '500',
+  },
+  retryBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    color: 'var(--text-muted)',
+    border: '1px solid var(--border-color)',
+    borderRadius: '6px',
+    padding: '6px 14px',
+    fontSize: '0.85rem',
+    fontFamily: 'var(--font-body)',
+    cursor: 'pointer',
+  },
+  textContent: {
+    color: 'var(--text-main)',
+    fontSize: '0.95rem',
+    lineHeight: '1.7',
+    fontFamily: 'var(--font-body)',
+    whiteSpace: 'pre-wrap',
+  },
+  cursor: {
+    display: 'inline-block',
+    width: '2px',
+    height: '1em',
+    backgroundColor: 'var(--text-main)',
+    marginLeft: '2px',
+    animation: 'blink 0.8s step-end infinite',
+    verticalAlign: 'text-bottom',
+  },
+  emptyState: {
     color: 'var(--text-muted)',
     fontStyle: 'italic',
     fontSize: '1.15rem'
@@ -220,47 +241,11 @@ const styles = {
     borderWidth: '1px',
     borderStyle: 'solid',
     borderRadius: '6px',
-    padding: '7px 16px',
+    padding: '7px 14px',
     fontSize: '0.85rem',
     fontWeight: '600',
     fontFamily: 'var(--font-body)',
     cursor: 'pointer',
-    transition: 'background-color 0.15s, color 0.15s',
+    transition: 'all 0.15s',
   },
-  errorContainer: {
-    height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '8px',
-    color: 'var(--accent-red)'
-  },
-  errorText: {
-    margin: 0,
-    fontWeight: '500',
-    fontSize: '1rem'
-  },
-  retryBtn: {
-    marginTop: '16px',
-    display: 'flex',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-    color: 'var(--text-main)',
-    border: '1px solid var(--border-color)',
-    padding: '8px 16px',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '0.95rem',
-    transition: 'background-color 0.2s'
-  }
 };
-
-if (typeof document !== 'undefined') {
-  const style = document.createElement('style');
-  style.textContent = `
-    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-    @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.2; } }
-  `;
-  document.head.appendChild(style);
-}

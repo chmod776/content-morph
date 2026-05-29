@@ -2,21 +2,24 @@ import React, { useEffect, useRef, useState } from 'react';
 import { X, Moon, Sun, Mic2, Globe, Layers, Zap, AlignLeft, Check } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 import { platforms } from '../platforms';
+import { useTranslation } from '../hooks/useTranslation';
 
 const languages = ['English', 'Spanish', 'French', 'German', 'Portuguese', 'Italian', 'Dutch', 'Japanese', 'Korean', 'Mandarin'];
-const contentLengths = [
-  { value: 'concise', label: 'Concise', desc: 'Shorter, punchier output' },
-  { value: 'standard', label: 'Standard', desc: 'Balanced length (default)' },
-  { value: 'detailed', label: 'Detailed', desc: 'More thorough output' },
-];
 
 export default function SettingsPanel({ isOpen, onClose }) {
   const { settings, updateSetting } = useSettings();
+  const t = useTranslation();
   const panelRef = useRef(null);
   const [draftVoice, setDraftVoice] = useState(settings.brandVoice);
   const [saved, setSaved] = useState(false);
 
   const hasChanges = draftVoice !== settings.brandVoice;
+
+  const contentLengths = [
+    { value: 'concise', label: t.conciseLabel, desc: t.conciseDesc },
+    { value: 'standard', label: t.standardLabel, desc: t.standardDesc },
+    { value: 'detailed', label: t.detailedLabel, desc: t.detailedDesc },
+  ];
 
   useEffect(() => {
     setDraftVoice(settings.brandVoice);
@@ -54,7 +57,7 @@ export default function SettingsPanel({ isOpen, onClose }) {
       <div style={styles.overlay} onClick={onClose} />
       <div ref={panelRef} style={styles.panel}>
         <div style={styles.header}>
-          <h2 style={styles.title}>Settings</h2>
+          <h2 style={styles.title}>{t.settingsTitle}</h2>
           <button style={styles.closeBtn} onClick={onClose}>
             <X size={20} />
           </button>
@@ -66,14 +69,12 @@ export default function SettingsPanel({ isOpen, onClose }) {
           <section style={styles.section}>
             <div style={styles.sectionHeader}>
               <Mic2 size={16} style={{ marginRight: '8px', color: 'var(--text-muted)' }} />
-              <h3 style={styles.sectionTitle}>Brand Voice</h3>
+              <h3 style={styles.sectionTitle}>{t.brandVoiceTitle}</h3>
             </div>
-            <p style={styles.sectionDesc}>
-              Describe your tone, style, and personality. This gets applied to every generation.
-            </p>
+            <p style={styles.sectionDesc}>{t.brandVoiceDesc}</p>
             <textarea
               style={styles.brandVoiceInput}
-              placeholder={`e.g. "Speak like a confident founder — direct, warm, no fluff. Use simple words. Avoid corporate jargon. Sound like you're texting a smart friend."`}
+              placeholder={t.brandVoicePlaceholder}
               value={draftVoice}
               onChange={(e) => { setDraftVoice(e.target.value); setSaved(false); }}
               rows={5}
@@ -83,7 +84,7 @@ export default function SettingsPanel({ isOpen, onClose }) {
             <div style={styles.voiceActions}>
               {draftVoice && (
                 <button style={styles.clearBtn} onClick={handleClearVoice}>
-                  Clear voice
+                  {t.clearVoice}
                 </button>
               )}
               <button
@@ -98,9 +99,9 @@ export default function SettingsPanel({ isOpen, onClose }) {
                 disabled={!hasChanges || saved}
               >
                 {saved ? (
-                  <><Check size={13} style={{ marginRight: '5px' }} />Saved</>
+                  <><Check size={13} style={{ marginRight: '5px' }} />{t.saved}</>
                 ) : (
-                  hasChanges ? 'Save changes' : 'Saved'
+                  hasChanges ? t.saveChanges : t.saved
                 )}
               </button>
             </div>
@@ -112,12 +113,12 @@ export default function SettingsPanel({ isOpen, onClose }) {
           <section style={styles.section}>
             <div style={styles.sectionHeader}>
               {settings.darkMode ? <Moon size={16} style={{ marginRight: '8px', color: 'var(--text-muted)' }} /> : <Sun size={16} style={{ marginRight: '8px', color: 'var(--text-muted)' }} />}
-              <h3 style={styles.sectionTitle}>Appearance</h3>
+              <h3 style={styles.sectionTitle}>{t.appearanceTitle}</h3>
             </div>
             <div style={styles.toggleRow}>
               <div>
-                <div style={styles.toggleLabel}>{settings.darkMode ? 'Dark Mode' : 'Light Mode'}</div>
-                <div style={styles.toggleDesc}>Switch the app theme</div>
+                <div style={styles.toggleLabel}>{settings.darkMode ? t.darkModeLabel : t.lightModeLabel}</div>
+                <div style={styles.toggleDesc}>{t.themeDesc}</div>
               </div>
               <button
                 style={{ ...styles.toggle, backgroundColor: settings.darkMode ? 'var(--text-main)' : 'var(--border-color)' }}
@@ -137,9 +138,9 @@ export default function SettingsPanel({ isOpen, onClose }) {
           <section style={styles.section}>
             <div style={styles.sectionHeader}>
               <Globe size={16} style={{ marginRight: '8px', color: 'var(--text-muted)' }} />
-              <h3 style={styles.sectionTitle}>Output Language</h3>
+              <h3 style={styles.sectionTitle}>{t.outputLanguageTitle}</h3>
             </div>
-            <p style={styles.sectionDesc}>All generated content will be written in this language.</p>
+            <p style={styles.sectionDesc}>{t.outputLanguageDesc}</p>
             <div style={styles.optionGrid}>
               {languages.map(lang => (
                 <button
@@ -164,9 +165,9 @@ export default function SettingsPanel({ isOpen, onClose }) {
           <section style={styles.section}>
             <div style={styles.sectionHeader}>
               <AlignLeft size={16} style={{ marginRight: '8px', color: 'var(--text-muted)' }} />
-              <h3 style={styles.sectionTitle}>Content Length</h3>
+              <h3 style={styles.sectionTitle}>{t.contentLengthTitle}</h3>
             </div>
-            <p style={styles.sectionDesc}>Controls how long each platform's output will be.</p>
+            <p style={styles.sectionDesc}>{t.contentLengthDesc}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {contentLengths.map(opt => (
                 <button
@@ -191,9 +192,9 @@ export default function SettingsPanel({ isOpen, onClose }) {
           <section style={styles.section}>
             <div style={styles.sectionHeader}>
               <Layers size={16} style={{ marginRight: '8px', color: 'var(--text-muted)' }} />
-              <h3 style={styles.sectionTitle}>Default Platforms</h3>
+              <h3 style={styles.sectionTitle}>{t.defaultPlatformsTitle}</h3>
             </div>
-            <p style={styles.sectionDesc}>Which platforms are pre-selected when you open the app.</p>
+            <p style={styles.sectionDesc}>{t.defaultPlatformsDesc}</p>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               {Object.values(platforms).map(p => {
                 const active = settings.defaultPlatforms.includes(p.id);

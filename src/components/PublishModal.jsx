@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Send, Clock, CheckCircle } from 'lucide-react';
 import { platforms } from '../platforms';
+import { useTranslation } from '../hooks/useTranslation';
 
 function getMinDatetimeStr() {
   const d = new Date(Date.now() + 60000);
@@ -23,6 +24,7 @@ export default function PublishModal({ posts, onClose, onPublishNow, onSchedule 
   });
   const [posted, setPosted] = useState(false);
   const [scheduleDatetime, setScheduleDatetime] = useState(getDefaultDatetimeStr);
+  const t = useTranslation();
 
   const activePlatform = platforms[activeTab];
 
@@ -39,7 +41,7 @@ export default function PublishModal({ posts, onClose, onPublishNow, onSchedule 
     if (!scheduleDatetime) return;
     const scheduledAt = new Date(scheduleDatetime).getTime();
     if (scheduledAt <= Date.now()) {
-      alert('Please choose a future date and time.');
+      alert(t.futureDate);
       return;
     }
     const editedPosts = posts.map(p => ({ platformId: p.platformId, content: editedContents[p.platformId] }));
@@ -55,7 +57,9 @@ export default function PublishModal({ posts, onClose, onPublishNow, onSchedule 
       <div style={styles.modal}>
         <div style={styles.header}>
           <h3 style={styles.title}>
-            {posts.length === 1 ? `Publish to ${activePlatform?.name}` : `Publish ${posts.length} Posts`}
+            {posts.length === 1
+              ? t.publishToSingle(activePlatform?.name)
+              : t.publishToMulti(posts.length)}
           </h3>
           <button style={styles.closeBtn} onClick={onClose}><X size={18} /></button>
         </div>
@@ -91,7 +95,7 @@ export default function PublishModal({ posts, onClose, onPublishNow, onSchedule 
               onChange={e => setEditedContents(prev => ({ ...prev, [activeTab]: e.target.value }))}
               rows={9}
             />
-            <span style={styles.charCount}>{currentContent.length} chars</span>
+            <span style={styles.charCount}>{currentContent.length} {t.chars}</span>
           </div>
 
           <div style={styles.actions}>
@@ -101,14 +105,14 @@ export default function PublishModal({ posts, onClose, onPublishNow, onSchedule 
               disabled={posted}
             >
               {posted
-                ? <><CheckCircle size={15} style={{ marginRight: '7px' }} />Posted!</>
-                : <><Send size={15} style={{ marginRight: '7px' }} />Post Now</>
+                ? <><CheckCircle size={15} style={{ marginRight: '7px' }} />{t.posted}</>
+                : <><Send size={15} style={{ marginRight: '7px' }} />{t.postNow}</>
               }
             </button>
 
             <div style={styles.orDivider}>
               <div style={styles.orLine} />
-              <span style={styles.orText}>or schedule for later</span>
+              <span style={styles.orText}>{t.orSchedule}</span>
               <div style={styles.orLine} />
             </div>
 
@@ -122,7 +126,7 @@ export default function PublishModal({ posts, onClose, onPublishNow, onSchedule 
               />
               <button style={styles.scheduleBtn} onClick={handleSchedule}>
                 <Clock size={14} style={{ marginRight: '7px' }} />
-                Schedule
+                {t.schedule}
               </button>
             </div>
           </div>

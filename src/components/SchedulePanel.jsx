@@ -1,8 +1,9 @@
 import React from 'react';
 import { X, Clock, CalendarOff } from 'lucide-react';
 import { platforms } from '../platforms';
+import { useTranslation } from '../hooks/useTranslation';
 
-function formatTime(timestamp) {
+function formatTime(timestamp, t) {
   const diff = timestamp - Date.now();
   const mins = Math.round(diff / 60000);
   const hours = Math.round(diff / 3600000);
@@ -12,14 +13,15 @@ function formatTime(timestamp) {
     hour: '2-digit', minute: '2-digit'
   });
   let relative;
-  if (mins < 60) relative = `in ${mins}m`;
-  else if (hours < 24) relative = `in ${hours}h`;
-  else relative = `in ${days}d`;
+  if (mins < 60) relative = t.inMinutes(mins);
+  else if (hours < 24) relative = t.inHours(hours);
+  else relative = t.inDays(days);
   return { full, relative };
 }
 
 export default function SchedulePanel({ isOpen, scheduledPosts, onCancel, onClose }) {
   const sorted = [...scheduledPosts].sort((a, b) => a.scheduledAt - b.scheduledAt);
+  const t = useTranslation();
 
   return (
     <>
@@ -28,7 +30,7 @@ export default function SchedulePanel({ isOpen, scheduledPosts, onCancel, onClos
         <div style={styles.header}>
           <div style={styles.headerLeft}>
             <Clock size={15} style={{ marginRight: '8px', color: 'var(--text-muted)' }} />
-            <h3 style={styles.title}>Scheduled Posts</h3>
+            <h3 style={styles.title}>{t.scheduledTitle}</h3>
             {scheduledPosts.length > 0 && (
               <span style={styles.badge}>{scheduledPosts.length}</span>
             )}
@@ -40,13 +42,13 @@ export default function SchedulePanel({ isOpen, scheduledPosts, onCancel, onClos
           {sorted.length === 0 ? (
             <div style={styles.empty}>
               <CalendarOff size={36} style={{ marginBottom: '14px', opacity: 0.25 }} />
-              <p style={styles.emptyTitle}>No scheduled posts</p>
-              <p style={styles.emptySub}>Click Publish on any output card to schedule a post for later.</p>
+              <p style={styles.emptyTitle}>{t.noScheduledTitle}</p>
+              <p style={styles.emptySub}>{t.noScheduledDesc}</p>
             </div>
           ) : (
             sorted.map(post => {
               const platform = platforms[post.platformId];
-              const { full, relative } = formatTime(post.scheduledAt);
+              const { full, relative } = formatTime(post.scheduledAt, t);
               return (
                 <div key={post.id} style={styles.entry}>
                   <div style={styles.entryHeader}>
@@ -63,7 +65,7 @@ export default function SchedulePanel({ isOpen, scheduledPosts, onCancel, onClos
                     onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(220,38,38,0.1)'}
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
-                    Cancel Post
+                    {t.cancelPost}
                   </button>
                 </div>
               );

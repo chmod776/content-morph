@@ -1,10 +1,13 @@
 import React from 'react';
 import { platforms } from '../platforms';
+import { useTranslation } from '../hooks/useTranslation';
 
 export default function PlatformSelector({ selectedPlatforms, togglePlatform, isGenerating }) {
+  const t = useTranslation();
+
   return (
     <div style={styles.container}>
-      <h3 style={styles.title}>Target Platforms</h3>
+      <h3 style={styles.title}>{t.targetPlatforms}</h3>
       <div style={styles.grid}>
         {Object.values(platforms).map(platform => {
           const isSelected = selectedPlatforms.includes(platform.id);

@@ -1,20 +1,22 @@
 import React, { useState } from 'react';
 import { X, RotateCcw, Trash2, Clock, ChevronRight } from 'lucide-react';
 import { platforms } from '../platforms';
+import { useTranslation } from '../hooks/useTranslation';
 
-function timeAgo(ts) {
+function timeAgo(ts, t) {
   const diff = Date.now() - ts;
   const mins = Math.floor(diff / 60000);
   const hrs = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${days}d ago`;
+  if (mins < 1) return t.justNow;
+  if (mins < 60) return t.minutesAgo(mins);
+  if (hrs < 24) return t.hoursAgo(hrs);
+  return t.daysAgo(days);
 }
 
 export default function HistoryPanel({ isOpen, onClose, history, onRestore, onClear, onDelete }) {
   const [expandedId, setExpandedId] = useState(null);
+  const t = useTranslation();
 
   if (!isOpen) return null;
 
@@ -25,13 +27,13 @@ export default function HistoryPanel({ isOpen, onClose, history, onRestore, onCl
         <div style={styles.header}>
           <div style={styles.headerLeft}>
             <Clock size={16} style={{ marginRight: '8px', color: 'var(--text-muted)' }} />
-            <h2 style={styles.title}>History</h2>
+            <h2 style={styles.title}>{t.historyTitle}</h2>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {history.length > 0 && (
-              <button style={styles.clearAllBtn} onClick={onClear} title="Clear all history">
+              <button style={styles.clearAllBtn} onClick={onClear} title={t.clearAll}>
                 <Trash2 size={14} style={{ marginRight: '5px' }} />
-                Clear all
+                {t.clearAll}
               </button>
             )}
             <button style={styles.closeBtn} onClick={onClose}>
@@ -44,8 +46,8 @@ export default function HistoryPanel({ isOpen, onClose, history, onRestore, onCl
           {history.length === 0 ? (
             <div style={styles.empty}>
               <Clock size={32} style={{ marginBottom: '12px', opacity: 0.3 }} />
-              <p style={styles.emptyTitle}>No history yet</p>
-              <p style={styles.emptyDesc}>Every time you Transform content, it'll be saved here so you can restore it any time.</p>
+              <p style={styles.emptyTitle}>{t.noHistoryTitle}</p>
+              <p style={styles.emptyDesc}>{t.noHistoryDesc}</p>
             </div>
           ) : (
             <div style={styles.list}>
@@ -58,7 +60,7 @@ export default function HistoryPanel({ isOpen, onClose, history, onRestore, onCl
                   <div key={entry.id} style={styles.entry}>
                     <div style={styles.entryHeader} onClick={() => setExpandedId(isExpanded ? null : entry.id)}>
                       <div style={styles.entryMeta}>
-                        <span style={styles.entryTime}>{timeAgo(entry.id)}</span>
+                        <span style={styles.entryTime}>{timeAgo(entry.id, t)}</span>
                         <div style={styles.entryPlatforms}>
                           {entry.selectedPlatforms.map(id => (
                             <span key={id} style={{ ...styles.platformDot, backgroundColor: platforms[id]?.color }} />
@@ -91,9 +93,9 @@ export default function HistoryPanel({ isOpen, onClose, history, onRestore, onCl
                         onClick={() => { onRestore(entry); onClose(); }}
                       >
                         <RotateCcw size={12} style={{ marginRight: '5px' }} />
-                        Restore
+                        {t.restore}
                       </button>
-                      <button style={styles.deleteBtn} onClick={() => onDelete(entry.id)} title="Delete this entry">
+                      <button style={styles.deleteBtn} onClick={() => onDelete(entry.id)}>
                         <Trash2 size={12} />
                       </button>
                     </div>
