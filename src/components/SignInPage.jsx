@@ -6,26 +6,16 @@ export default function SignInPage() {
 
   return (
     <div style={styles.root}>
-      <div style={styles.left}>
-        <div style={styles.leftInner}>
-          <h1 style={styles.logo}>Content Morph</h1>
-          <p style={styles.tagline}>Transform your raw notes into platform-ready posts — Twitter/X, LinkedIn, Instagram, and YouTube — in seconds.</p>
-        </div>
-        <p style={styles.leftFooter}>© {new Date().getFullYear()} Content Morph</p>
-      </div>
+      <div style={styles.card}>
+        <h1 style={styles.logo}>Content Morph</h1>
+        <p style={styles.tagline}>Transform your raw notes into platform-ready posts.</p>
 
-      <div style={styles.right}>
-        <div style={styles.card}>
-          <h2 style={styles.welcomeTitle}>Welcome back</h2>
-          <p style={styles.welcomeDesc}>Sign in to access your voice profile and content history.</p>
+        <button style={styles.googleBtn} onClick={login}>
+          <GoogleIcon />
+          Continue with Google
+        </button>
 
-          <button style={styles.googleBtn} onClick={login}>
-            <GoogleIcon />
-            Continue with Google
-          </button>
-
-          <p style={styles.hint}>No password needed — we use your Google account.</p>
-        </div>
+        <p style={styles.hint}>No password needed — we use your Google account.</p>
       </div>
     </div>
   );
@@ -46,66 +36,29 @@ const styles = {
   root: {
     minHeight: '100vh',
     display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: 'var(--bg-color)',
+    padding: '24px',
   },
-  left: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'space-between',
-    padding: '48px',
-    background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)',
-    borderRight: '1px solid var(--border-color)',
-  },
-  leftInner: {
-    maxWidth: '480px',
+  card: {
+    width: '100%',
+    maxWidth: '380px',
+    textAlign: 'center',
   },
   logo: {
-    margin: '0 0 24px',
-    fontSize: '3rem',
+    margin: '0 0 10px',
+    fontSize: '2.8rem',
     fontWeight: '700',
     fontFamily: 'var(--font-heading)',
     letterSpacing: '-0.02em',
     color: 'var(--text-main)',
   },
   tagline: {
-    margin: 0,
-    fontSize: '1.25rem',
-    lineHeight: '1.7',
-    color: 'var(--text-muted)',
-    fontFamily: 'var(--font-body)',
-    maxWidth: '420px',
-  },
-  leftFooter: {
-    margin: 0,
-    fontSize: '0.82rem',
-    color: 'var(--text-muted)',
-    fontFamily: 'var(--font-body)',
-    opacity: 0.6,
-  },
-  right: {
-    width: '480px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '48px',
-  },
-  card: {
-    width: '100%',
-    maxWidth: '360px',
-  },
-  welcomeTitle: {
-    margin: '0 0 8px',
-    fontSize: '1.8rem',
-    fontWeight: '700',
-    fontFamily: 'var(--font-heading)',
-    color: 'var(--text-main)',
-  },
-  welcomeDesc: {
-    margin: '0 0 36px',
-    fontSize: '0.95rem',
-    color: 'var(--text-muted)',
+    margin: '0 0 40px',
+    fontSize: '1rem',
     lineHeight: '1.6',
+    color: 'var(--text-muted)',
     fontFamily: 'var(--font-body)',
   },
   googleBtn: {
