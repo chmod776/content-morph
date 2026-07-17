@@ -105,46 +105,50 @@ passport.serializeUser((user, cb) => cb(null, user));
 passport.deserializeUser((user, cb) => cb(null, user));
 
 // ── Auth Routes ───────────────────────────────────────────────────────────────
-const registeredStrategies = new Set();
+// Use the Replit-provided public domain; fall back to x-forwarded-host then req.hostname.
+function getPublicHostname(req) {
+  return process.env.REPLIT_DEV_DOMAIN
+    || req.get('x-forwarded-host')
+    || req.hostname;
+}
 
-function ensureStrategy(hostname) {
-  const name = `replitauth:${hostname}`;
-  if (!registeredStrategies.has(name)) {
-    getOidcConfig().then(config => {
-      const strategy = new Strategy(
-        {
-          name,
-          config,
-          scope: 'openid email profile offline_access',
-          callbackURL: `https://${hostname}/api/callback`,
-        },
-        async (tokens, verified) => {
-          const user = {};
-          updateUserSession(user, tokens);
-          await upsertUser(tokens.claims());
-          verified(null, user);
-        }
-      );
-      passport.use(strategy);
-      registeredStrategies.add(name);
-    });
-  }
+const STRATEGY_NAME = 'replitauth';
+let strategyReady = false;
+
+async function ensureStrategy(hostname) {
+  if (strategyReady) return;
+  const config = await getOidcConfig();
+  const strategy = new Strategy(
+    {
+      name: STRATEGY_NAME,
+      config,
+      scope: 'openid email profile offline_access',
+      callbackURL: `https://${hostname}/api/callback`,
+    },
+    async (tokens, verified) => {
+      const user = {};
+      updateUserSession(user, tokens);
+      await upsertUser(tokens.claims());
+      verified(null, user);
+    }
+  );
+  passport.use(strategy);
+  strategyReady = true;
 }
 
 app.get('/api/login', async (req, res, next) => {
-  await getOidcConfig(); // warm up
-  ensureStrategy(req.hostname);
-  // slight delay to let strategy register
-  setTimeout(() => {
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      prompt: 'login consent',
-      scope: ['openid', 'email', 'profile', 'offline_access'],
-    })(req, res, next);
-  }, 200);
+  const hostname = getPublicHostname(req);
+  await ensureStrategy(hostname);
+  passport.authenticate(STRATEGY_NAME, {
+    prompt: 'login consent',
+    scope: ['openid', 'email', 'profile', 'offline_access'],
+  })(req, res, next);
 });
 
-app.get('/api/callback', (req, res, next) => {
-  passport.authenticate(`replitauth:${req.hostname}`, {
+app.get('/api/callback', async (req, res, next) => {
+  const hostname = getPublicHostname(req);
+  await ensureStrategy(hostname);
+  passport.authenticate(STRATEGY_NAME, {
     successRedirect: '/',
     failureRedirect: '/api/login',
   })(req, res, next);
