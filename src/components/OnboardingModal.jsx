@@ -1,10 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { X, ArrowRight, Check, Upload, Trash2 } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check, Upload, Trash2 } from 'lucide-react';
 import { useProfile } from '../context/ProfileContext';
 
 const STEPS = ['welcome', 'voice', 'samples', 'done'];
+const MIN_VOICE_CHARS = 50;
+const MIN_SAMPLE_CHARS = 50;
 
-export default function OnboardingModal({ onComplete }) {
+export default function OnboardingModal({ onComplete, onSkip }) {
   const { updateProfile } = useProfile();
   const [step, setStep]           = useState(0);
   const [voice, setVoice]         = useState('');
@@ -15,14 +17,20 @@ export default function OnboardingModal({ onComplete }) {
 
   const currentStep = STEPS[step];
 
-  const handleSkip = async () => {
+  const voiceValid   = voice.trim().length >= MIN_VOICE_CHARS;
+  const samplesValid = samples.some(s => s.trim().length >= MIN_SAMPLE_CHARS);
+
+  const handleSkipForNow = async () => {
     setSaving(true);
     try { await updateProfile({ onboarded: true }); } catch {}
     setSaving(false);
-    onComplete();
+    onSkip();
   };
 
   const handleNext = () => setStep(s => s + 1);
+  const handleBack = () => setStep(s => s - 1);
+
+  const handleSkipStep = () => setStep(s => s + 1);
 
   const handleFinish = async () => {
     setSaving(true);
@@ -42,7 +50,7 @@ export default function OnboardingModal({ onComplete }) {
     const allowed = ['.txt', '.md', '.pdf', '.docx'];
     const ext = '.' + file.name.split('.').pop().toLowerCase();
     if (!allowed.includes(ext)) {
-      alert(`Unsupported file type. Please upload .txt, .md, .pdf, or .docx`);
+      alert('Unsupported file type. Please upload .txt, .md, .pdf, or .docx');
       return;
     }
     setUploadingIdx(idx);
@@ -85,7 +93,9 @@ export default function OnboardingModal({ onComplete }) {
             <h2 style={styles.title}>Welcome to Content Morph</h2>
             <p style={styles.desc}>In the next two steps you'll set your brand voice and add a few writing samples. Content Morph will use them to make every generated post sound exactly like you.</p>
             <div style={styles.actions}>
-              <button style={styles.skipBtn} onClick={handleSkip} disabled={saving}>Skip for now</button>
+              <button style={styles.skipBtn} onClick={handleSkipForNow} disabled={saving}>
+                {saving ? 'Saving…' : 'Skip for now'}
+              </button>
               <button style={styles.primaryBtn} onClick={handleNext}>
                 Get started <ArrowRight size={16} style={{ marginLeft: '6px' }} />
               </button>
@@ -107,9 +117,21 @@ export default function OnboardingModal({ onComplete }) {
               onFocus={e => e.target.style.borderColor = 'var(--text-muted)'}
               onBlur={e => e.target.style.borderColor = 'var(--border-color)'}
             />
+            <div style={styles.charHint}>
+              <span style={{ color: voiceValid ? 'var(--text-muted)' : '#e57373' }}>
+                {voice.trim().length} / {MIN_VOICE_CHARS} characters minimum
+              </span>
+            </div>
             <div style={styles.actions}>
-              <button style={styles.skipBtn} onClick={handleNext}>Skip this step</button>
-              <button style={styles.primaryBtn} onClick={handleNext}>
+              <button style={styles.backBtn} onClick={handleBack}>
+                <ArrowLeft size={14} style={{ marginRight: '4px' }} /> Back
+              </button>
+              <button style={styles.skipBtn} onClick={handleSkipStep}>Skip this step</button>
+              <button
+                style={{ ...styles.primaryBtn, opacity: voiceValid ? 1 : 0.4, cursor: voiceValid ? 'pointer' : 'not-allowed' }}
+                onClick={handleNext}
+                disabled={!voiceValid}
+              >
                 Next <ArrowRight size={16} style={{ marginLeft: '6px' }} />
               </button>
             </div>
@@ -163,9 +185,23 @@ export default function OnboardingModal({ onComplete }) {
                 </div>
               ))}
             </div>
+            <div style={styles.charHint}>
+              <span style={{ color: samplesValid ? 'var(--text-muted)' : '#e57373' }}>
+                {samplesValid
+                  ? 'Looks good — at least one sample has enough content'
+                  : `Add at least ${MIN_SAMPLE_CHARS} characters in one sample to continue`}
+              </span>
+            </div>
             <div style={styles.actions}>
-              <button style={styles.skipBtn} onClick={handleNext}>Skip this step</button>
-              <button style={styles.primaryBtn} onClick={handleNext}>
+              <button style={styles.backBtn} onClick={handleBack}>
+                <ArrowLeft size={14} style={{ marginRight: '4px' }} /> Back
+              </button>
+              <button style={styles.skipBtn} onClick={handleSkipStep}>Skip this step</button>
+              <button
+                style={{ ...styles.primaryBtn, opacity: samplesValid ? 1 : 0.4, cursor: samplesValid ? 'pointer' : 'not-allowed' }}
+                onClick={handleNext}
+                disabled={!samplesValid}
+              >
                 Next <ArrowRight size={16} style={{ marginLeft: '6px' }} />
               </button>
             </div>
@@ -253,14 +289,20 @@ const styles = {
     fontFamily: 'var(--font-body)',
     resize: 'vertical',
     transition: 'border-color 0.2s',
-    marginBottom: '20px',
+    marginBottom: '8px',
     boxSizing: 'border-box',
+  },
+  charHint: {
+    fontSize: '0.78rem',
+    fontFamily: 'var(--font-body)',
+    marginBottom: '16px',
+    minHeight: '18px',
   },
   samplesGrid: {
     display: 'flex',
     flexDirection: 'column',
     gap: '14px',
-    marginBottom: '20px',
+    marginBottom: '8px',
   },
   sampleBlock: {
     display: 'flex',
@@ -321,6 +363,19 @@ const styles = {
     alignItems: 'center',
     gap: '12px',
     marginTop: '4px',
+  },
+  backBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    background: 'transparent',
+    border: '1px solid var(--border-color)',
+    color: 'var(--text-muted)',
+    fontSize: '0.88rem',
+    fontFamily: 'var(--font-body)',
+    cursor: 'pointer',
+    padding: '6px 14px',
+    borderRadius: '7px',
+    marginRight: 'auto',
   },
   skipBtn: {
     background: 'transparent',

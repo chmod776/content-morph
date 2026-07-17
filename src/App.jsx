@@ -39,6 +39,7 @@ export default function App() {
   const [history, setHistory]                   = useState(loadHistory);
   const [showOnboarding, setShowOnboarding]     = useState(false);
   const [gearPulse, setGearPulse]               = useState(false);
+  const [showSkipAlert, setShowSkipAlert]       = useState(false);
 
   // Show onboarding only once auth + profile are ready and user is not yet onboarded
   useEffect(() => {
@@ -49,11 +50,21 @@ export default function App() {
 
   const handleOnboardingComplete = () => {
     setShowOnboarding(false);
-    // Pulse the gear icon to draw attention
     setTimeout(() => {
       setGearPulse(true);
       setTimeout(() => setGearPulse(false), 2500);
     }, 400);
+  };
+
+  const handleOnboardingSkip = () => {
+    setShowOnboarding(false);
+    setGearPulse(true);
+    setShowSkipAlert(true);
+  };
+
+  const handleDismissSkipAlert = () => {
+    setShowSkipAlert(false);
+    setGearPulse(false);
   };
 
   const togglePlatform = (id) => {
@@ -251,7 +262,24 @@ export default function App() {
         onClear={handleHistoryClear}
       />
 
-      {showOnboarding && <OnboardingModal onComplete={handleOnboardingComplete} />}
+      {showOnboarding && (
+        <OnboardingModal
+          onComplete={handleOnboardingComplete}
+          onSkip={handleOnboardingSkip}
+        />
+      )}
+
+      {showSkipAlert && (
+        <div style={styles.skipAlert}>
+          <div style={styles.skipAlertArrow} />
+          <p style={styles.skipAlertText}>
+            ⚙️ You can update your voice and writing samples anytime from <strong>Settings</strong> (gear icon) in the top-right corner.
+          </p>
+          <button style={styles.skipAlertBtn} onClick={handleDismissSkipAlert}>
+            Got it
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -272,5 +300,49 @@ const styles = {
     backgroundColor: 'transparent',
     borderRadius: '16px',
     overflow: 'hidden',
-  }
+  },
+  skipAlert: {
+    position: 'fixed',
+    top: '64px',
+    right: '20px',
+    zIndex: 300,
+    backgroundColor: 'var(--panel-bg)',
+    border: '1px solid var(--border-color)',
+    borderRadius: '12px',
+    padding: '16px 18px',
+    maxWidth: '300px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+    animation: 'fadeSlideIn 0.25s ease-out',
+  },
+  skipAlertArrow: {
+    position: 'absolute',
+    top: '-7px',
+    right: '18px',
+    width: '12px',
+    height: '12px',
+    backgroundColor: 'var(--panel-bg)',
+    border: '1px solid var(--border-color)',
+    borderBottom: 'none',
+    borderRight: 'none',
+    transform: 'rotate(45deg)',
+  },
+  skipAlertText: {
+    margin: '0 0 12px',
+    fontSize: '0.88rem',
+    color: 'var(--text-muted)',
+    lineHeight: '1.55',
+    fontFamily: 'var(--font-body)',
+  },
+  skipAlertBtn: {
+    width: '100%',
+    padding: '8px 0',
+    backgroundColor: 'var(--text-main)',
+    color: 'var(--bg-color)',
+    border: 'none',
+    borderRadius: '7px',
+    fontSize: '0.88rem',
+    fontFamily: 'var(--font-body)',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
 };
