@@ -1,53 +1,60 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { flushSync } from 'react-dom';
 import InputPanel from './components/InputPanel';
 import PlatformSelector from './components/PlatformSelector';
 import OutputGrid from './components/OutputGrid';
 import SettingsPanel from './components/SettingsPanel';
 import HistoryPanel from './components/HistoryPanel';
-import PublishModal from './components/PublishModal';
-import SchedulePanel from './components/SchedulePanel';
+import OnboardingModal from './components/OnboardingModal';
 import { platforms } from './platforms';
 import { useSettings } from './context/SettingsContext';
+import { useProfile } from './context/ProfileContext';
+import { useAuth } from './context/AuthContext';
 
 const MAX_HISTORY = 50;
 
 function loadHistory() {
-  try {
-    return JSON.parse(localStorage.getItem('contentmorph-history') || '[]');
-  } catch { return []; }
+  try { return JSON.parse(localStorage.getItem('contentmorph-history') || '[]'); }
+  catch { return []; }
 }
 
 function saveHistory(h) {
   localStorage.setItem('contentmorph-history', JSON.stringify(h));
 }
 
-function loadScheduled() {
-  try {
-    return JSON.parse(localStorage.getItem('contentmorph-scheduled') || '[]');
-  } catch { return []; }
-}
-
-function saveScheduled(posts) {
-  localStorage.setItem('contentmorph-scheduled', JSON.stringify(posts));
-}
-
 export default function App() {
   const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
   const { settings } = useSettings();
+  const { profile, profileLoading } = useProfile();
+  const { user } = useAuth();
+  const settingsRef = useRef(null);
 
-  const [input, setInput] = useState('');
+  const [input, setInput]                       = useState('');
   const [selectedPlatforms, setSelectedPlatforms] = useState(settings.defaultPlatforms);
-  const [outputs, setOutputs] = useState({});
-  const [loadingStates, setLoadingStates] = useState({});
-  const [errors, setErrors] = useState({});
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [scheduleOpen, setScheduleOpen] = useState(false);
-  const [publishModal, setPublishModal] = useState(null);
-  const [history, setHistory] = useState(loadHistory);
-  const [scheduledPosts, setScheduledPosts] = useState(loadScheduled);
+  const [outputs, setOutputs]                   = useState({});
+  const [loadingStates, setLoadingStates]       = useState({});
+  const [errors, setErrors]                     = useState({});
+  const [settingsOpen, setSettingsOpen]         = useState(false);
+  const [historyOpen, setHistoryOpen]           = useState(false);
+  const [history, setHistory]                   = useState(loadHistory);
+  const [showOnboarding, setShowOnboarding]     = useState(false);
+  const [gearPulse, setGearPulse]               = useState(false);
 
+  // Show onboarding only once auth + profile are ready and user is not yet onboarded
+  useEffect(() => {
+    if (!profileLoading && profile && !profile.onboarded) {
+      setShowOnboarding(true);
+    }
+  }, [profileLoading, profile]);
+
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+    // Pulse the gear icon to draw attention
+    setTimeout(() => {
+      setGearPulse(true);
+      setTimeout(() => setGearPulse(false), 2500);
+    }, 400);
+  };
 
   const togglePlatform = (id) => {
     setSelectedPlatforms(prev =>
@@ -58,8 +65,19 @@ export default function App() {
   const buildSystemPrompt = (platformPrompt) => {
     let prompt = platformPrompt;
 
-    if (settings.brandVoice?.trim()) {
-      prompt = `BRAND VOICE OVERRIDE — Apply this brand voice to all output, overriding any default tone guidance: "${settings.brandVoice.trim()}"\n\n${prompt}`;
+    // Voice profile from account (overrides localStorage brandVoice)
+    const brandVoice = profile?.brand_voice || settings.brandVoice || '';
+    const writingSamples = profile?.writing_samples || [];
+
+    if (brandVoice.trim()) {
+      prompt = `BRAND VOICE OVERRIDE — Apply this brand voice to all output, overriding any default tone guidance: "${brandVoice.trim()}"\n\n${prompt}`;
+    }
+
+    if (writingSamples.length > 0) {
+      const samplesText = writingSamples
+        .map((s, i) => `Sample ${i + 1}:\n${s.trim()}`)
+        .join('\n\n---\n\n');
+      prompt += `\n\nWRITING SAMPLES — The user has provided examples of their own writing. Study their voice, rhythm, vocabulary, sentence structure, and tone. Mimic these qualities in your output — do NOT copy the content, only the style:\n\n${samplesText}`;
     }
 
     if (settings.outputLanguage && settings.outputLanguage !== 'English') {
@@ -102,9 +120,7 @@ export default function App() {
         })
       });
 
-      if (!response.ok) {
-        throw new Error(`API Error: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`API Error: ${response.status}`);
 
       let fullText = '';
       const reader = response.body.getReader();
@@ -113,30 +129,23 @@ export default function App() {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
         const chunk = decoder.decode(value, { stream: true });
         const lines = chunk.split('\n');
-
         for (const line of lines) {
           if (line.startsWith('data: ') && line !== 'data: [DONE]') {
             let parsed = null;
-            try { parsed = JSON.parse(line.trim().slice(6)); } catch (e) { continue; }
+            try { parsed = JSON.parse(line.trim().slice(6)); } catch { continue; }
             const text = parsed?.choices?.[0]?.delta?.content || '';
             if (text) {
               fullText += text;
-              // Force React to paint this token, then yield to the browser
-              flushSync(() => {
-                setOutputs(prev => ({ ...prev, [platformId]: fullText }));
-              });
+              flushSync(() => { setOutputs(prev => ({ ...prev, [platformId]: fullText })); });
               await new Promise(resolve => requestAnimationFrame(resolve));
             }
           }
         }
       }
 
-      // Final commit to ensure the complete text is in state
       setOutputs(prev => ({ ...prev, [platformId]: fullText }));
-
       return fullText;
     } catch (err) {
       console.error(`Error generating for ${platformId}:`, err);
@@ -148,12 +157,7 @@ export default function App() {
   };
 
   const addToHistory = (inputText, platforms, completedOutputs) => {
-    const entry = {
-      id: Date.now(),
-      input: inputText,
-      selectedPlatforms: platforms,
-      outputs: completedOutputs,
-    };
+    const entry = { id: Date.now(), input: inputText, selectedPlatforms: platforms, outputs: completedOutputs };
     setHistory(prev => {
       const next = [entry, ...prev].slice(0, MAX_HISTORY);
       saveHistory(next);
@@ -163,22 +167,19 @@ export default function App() {
 
   const handleGenerate = () => {
     if (!apiKey) {
-      alert("OpenAI API Key is missing! Please set VITE_OPENAI_API_KEY in your environment.");
+      alert('OpenAI API Key is missing! Please set VITE_OPENAI_API_KEY in your environment.');
       return;
     }
     const currentInput = input;
     const currentPlatforms = [...selectedPlatforms];
     const completedOutputs = {};
     let completedCount = 0;
-
     currentPlatforms.forEach(platformId => {
       generateForPlatform(platformId, currentInput).then((result) => {
         if (result) completedOutputs[platformId] = result;
         completedCount++;
-        if (completedCount === currentPlatforms.length) {
-          if (Object.keys(completedOutputs).length > 0) {
-            addToHistory(currentInput, currentPlatforms, completedOutputs);
-          }
+        if (completedCount === currentPlatforms.length && Object.keys(completedOutputs).length > 0) {
+          addToHistory(currentInput, currentPlatforms, completedOutputs);
         }
       });
     });
@@ -193,17 +194,10 @@ export default function App() {
   };
 
   const handleHistoryDelete = (id) => {
-    setHistory(prev => {
-      const next = prev.filter(e => e.id !== id);
-      saveHistory(next);
-      return next;
-    });
+    setHistory(prev => { const next = prev.filter(e => e.id !== id); saveHistory(next); return next; });
   };
 
-  const handleHistoryClear = () => {
-    setHistory([]);
-    saveHistory([]);
-  };
+  const handleHistoryClear = () => { setHistory([]); saveHistory([]); };
 
   const handleSave = () => {
     if (!input.trim()) return;
@@ -215,58 +209,6 @@ export default function App() {
     a.click();
     URL.revokeObjectURL(url);
   };
-
-  const handleOpenPublish = (platformId) => {
-    const content = outputs[platformId];
-    if (!content) return;
-    setPublishModal({ posts: [{ platformId, content }] });
-  };
-
-  const handleOpenPublishAll = () => {
-    const posts = selectedPlatforms
-      .filter(id => outputs[id] && !loadingStates[id])
-      .map(id => ({ platformId: id, content: outputs[id] }));
-    if (posts.length === 0) return;
-    setPublishModal({ posts });
-  };
-
-  const handlePublishNow = (_editedPosts) => {
-    // Post Now: modal handles success state, nothing extra needed
-  };
-
-  const handleSchedule = (editedPosts, scheduledAt) => {
-    const newEntries = editedPosts.map(p => ({
-      id: Date.now() + Math.random(),
-      platformId: p.platformId,
-      content: p.content,
-      scheduledAt,
-    }));
-    setScheduledPosts(prev => {
-      const next = [...prev, ...newEntries];
-      saveScheduled(next);
-      return next;
-    });
-  };
-
-  const handleCancelScheduled = (id) => {
-    setScheduledPosts(prev => {
-      const next = prev.filter(p => p.id !== id);
-      saveScheduled(next);
-      return next;
-    });
-  };
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = Date.now();
-      setScheduledPosts(prev => {
-        const remaining = prev.filter(p => p.scheduledAt > now);
-        if (remaining.length !== prev.length) saveScheduled(remaining);
-        return remaining;
-      });
-    }, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
   const isGenerating = Object.values(loadingStates).some(state => state);
 
@@ -282,8 +224,8 @@ export default function App() {
           onSettingsOpen={() => setSettingsOpen(true)}
           onHistoryOpen={() => setHistoryOpen(true)}
           historyCount={history.length}
-          onScheduleOpen={() => setScheduleOpen(true)}
-          scheduledCount={scheduledPosts.length}
+          settingsRef={settingsRef}
+          gearPulse={gearPulse}
         />
         <PlatformSelector
           selectedPlatforms={selectedPlatforms}
@@ -296,8 +238,6 @@ export default function App() {
           loadingStates={loadingStates}
           errors={errors}
           onRetry={(platformId) => generateForPlatform(platformId, input)}
-          onPublishAll={handleOpenPublishAll}
-          onPublish={handleOpenPublish}
         />
       </main>
 
@@ -310,20 +250,8 @@ export default function App() {
         onDelete={handleHistoryDelete}
         onClear={handleHistoryClear}
       />
-      <SchedulePanel
-        isOpen={scheduleOpen}
-        scheduledPosts={scheduledPosts}
-        onCancel={handleCancelScheduled}
-        onClose={() => setScheduleOpen(false)}
-      />
-      {publishModal && (
-        <PublishModal
-          posts={publishModal.posts}
-          onClose={() => setPublishModal(null)}
-          onPublishNow={handlePublishNow}
-          onSchedule={handleSchedule}
-        />
-      )}
+
+      {showOnboarding && <OnboardingModal onComplete={handleOnboardingComplete} />}
     </div>
   );
 }

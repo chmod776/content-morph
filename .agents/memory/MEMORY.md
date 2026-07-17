@@ -1,0 +1,3 @@
+- [Full-stack architecture](fullstack-arch.md) — Express backend on :3001, Vite dev on :5000 proxied via Vite config; concurrently runs both via `npm run dev:all`
+- [Replit Auth setup](replit-auth.md) — uses openid-client + passport OIDC with Replit as provider; routes /api/login /api/callback /api/logout; SESSION_SECRET and REPL_ID auto-provided by Replit
+- [Profile DB schema](profile-schema.md) — three PostgreSQL tables: sessions, users, profiles; profiles has brand_voice, writing_samples (JSONB), onboarded (bool)

@@ -1,9 +1,8 @@
 import React from 'react';
-import { Send } from 'lucide-react';
 import OutputCard from './OutputCard';
 import { useTranslation } from '../hooks/useTranslation';
 
-export default function OutputGrid({ selectedPlatforms, outputs, loadingStates, errors, onRetry, onPublishAll, onPublish }) {
+export default function OutputGrid({ selectedPlatforms, outputs, loadingStates, errors, onRetry }) {
   const t = useTranslation();
 
   if (selectedPlatforms.length === 0) {
@@ -14,22 +13,10 @@ export default function OutputGrid({ selectedPlatforms, outputs, loadingStates, 
     );
   }
 
-  const readyCount = selectedPlatforms.filter(id => outputs[id] && !loadingStates[id]).length;
-
   return (
     <div style={styles.container}>
       <div style={styles.header}>
         <h3 style={styles.title}>{t.results}</h3>
-        {readyCount > 0 && (
-          <button
-            style={styles.publishBtn}
-            onClick={onPublishAll}
-            title={t.publishAll(readyCount)}
-          >
-            <Send size={14} style={{ marginRight: '7px' }} />
-            {t.publishAll(readyCount)}
-          </button>
-        )}
       </div>
       <div style={styles.grid}>
         {selectedPlatforms.map(platformId => (
@@ -40,7 +27,6 @@ export default function OutputGrid({ selectedPlatforms, outputs, loadingStates, 
             loading={loadingStates[platformId] || false}
             error={errors[platformId] || null}
             onRetry={() => onRetry(platformId)}
-            onPublish={() => onPublish(platformId)}
           />
         ))}
       </div>
@@ -65,20 +51,6 @@ const styles = {
     fontSize: '1.5rem',
     fontWeight: '700',
     color: 'var(--text-main)'
-  },
-  publishBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    backgroundColor: 'var(--text-main)',
-    color: 'var(--bg-color)',
-    border: 'none',
-    padding: '10px 20px',
-    borderRadius: '4px',
-    fontWeight: '600',
-    fontSize: '0.95rem',
-    fontFamily: 'var(--font-body)',
-    cursor: 'pointer',
-    transition: 'opacity 0.2s ease'
   },
   grid: {
     display: 'grid',

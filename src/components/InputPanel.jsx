@@ -1,42 +1,83 @@
-import React from 'react';
-import { Send, Save, Link, Calendar, History, Settings, User } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Send, Save, History, Settings, LogOut, ChevronDown, User } from 'lucide-react';
 import { useTranslation } from '../hooks/useTranslation';
+import { useAuth } from '../context/AuthContext';
 
-export default function InputPanel({ input, setInput, isGenerating, onGenerate, onSave, onSettingsOpen, onHistoryOpen, historyCount, onScheduleOpen, scheduledCount }) {
+export default function InputPanel({ input, setInput, isGenerating, onGenerate, onSave, onSettingsOpen, onHistoryOpen, historyCount, settingsRef, gearPulse }) {
   const t = useTranslation();
+  const { user, logout } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const displayName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.email || 'Account';
+  const initials = displayName.slice(0, 1).toUpperCase();
 
   return (
     <div style={styles.container}>
       <div style={styles.header}>
         <h2 style={styles.title}>Content Morph</h2>
         <div style={styles.headerIcons}>
-          <div style={styles.userChip}>
-            <User size={13} style={{ marginRight: '5px' }} />
-            <span style={styles.userName}>calebmamol</span>
-          </div>
-          <button style={styles.iconBtn} title={t.shareLink}>
-            <Link size={16} />
-          </button>
-          <button style={{ ...styles.iconBtn, position: 'relative' }} title={t.scheduledPosts} onClick={onScheduleOpen}>
-            <Calendar size={16} />
-            {scheduledCount > 0 && (
-              <span style={styles.historyBadge}>{scheduledCount > 9 ? '9+' : scheduledCount}</span>
+          {/* Account menu */}
+          <div style={{ position: 'relative' }} ref={menuRef}>
+            <button
+              style={styles.userChip}
+              onClick={() => setMenuOpen(o => !o)}
+              title="Account"
+            >
+              {user?.profile_image_url ? (
+                <img src={user.profile_image_url} alt="" style={styles.avatar} />
+              ) : (
+                <div style={styles.avatarInitials}>{initials}</div>
+              )}
+              <span style={styles.userName}>{displayName}</span>
+              <ChevronDown size={12} style={{ marginLeft: '4px', opacity: 0.6 }} />
+            </button>
+            {menuOpen && (
+              <div style={styles.dropdown}>
+                <div style={styles.dropdownHeader}>
+                  <div style={styles.dropdownName}>{displayName}</div>
+                  {user?.email && <div style={styles.dropdownEmail}>{user.email}</div>}
+                </div>
+                <div style={styles.dropdownDivider} />
+                <button
+                  style={styles.dropdownItem}
+                  onClick={() => { setMenuOpen(false); logout(); }}
+                >
+                  <LogOut size={14} style={{ marginRight: '8px' }} />
+                  Sign out
+                </button>
+              </div>
             )}
-          </button>
+          </div>
+
           <button style={{ ...styles.iconBtn, position: 'relative' }} title={t.history} onClick={onHistoryOpen}>
             <History size={16} />
             {historyCount > 0 && (
               <span style={styles.historyBadge}>{historyCount > 9 ? '9+' : historyCount}</span>
             )}
           </button>
-          <button style={styles.iconBtn} title={t.settings} onClick={onSettingsOpen}>
+          <button
+            ref={settingsRef}
+            style={styles.iconBtn}
+            className={gearPulse ? 'gear-pulse' : ''}
+            title={t.settings}
+            onClick={onSettingsOpen}
+          >
             <Settings size={16} />
           </button>
         </div>
       </div>
-      
+
       <p style={styles.subtitle}>{t.subtitle}</p>
-      
+
       <div style={styles.inputWrapper}>
         <textarea
           style={styles.textarea}
@@ -55,7 +96,7 @@ export default function InputPanel({ input, setInput, isGenerating, onGenerate, 
         />
         <div style={styles.footer}>
           <span style={styles.charCount}>{input.length} {t.characters}</span>
-          
+
           <button
             style={{
               ...styles.saveBtn,
@@ -70,7 +111,7 @@ export default function InputPanel({ input, setInput, isGenerating, onGenerate, 
             {t.save}
           </button>
 
-          <button 
+          <button
             style={{
               ...styles.transformBtn,
               opacity: (!input.trim() || isGenerating) ? 0.5 : 1,
@@ -130,15 +171,88 @@ const styles = {
     backgroundColor: 'rgba(255,255,255,0.07)',
     border: '1px solid var(--border-color)',
     borderRadius: '20px',
-    padding: '5px 12px',
+    padding: '5px 10px 5px 6px',
     color: 'var(--text-muted)',
     fontSize: '0.85rem',
-    marginRight: '8px'
+    marginRight: '8px',
+    cursor: 'pointer',
+    gap: '6px',
+  },
+  avatar: {
+    width: '22px',
+    height: '22px',
+    borderRadius: '50%',
+    objectFit: 'cover',
+  },
+  avatarInitials: {
+    width: '22px',
+    height: '22px',
+    borderRadius: '50%',
+    backgroundColor: 'var(--border-color)',
+    color: 'var(--text-main)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '0.72rem',
+    fontWeight: '700',
+    fontFamily: 'var(--font-body)',
+    flexShrink: 0,
   },
   userName: {
     fontFamily: 'var(--font-body)',
     fontSize: '0.82rem',
-    color: 'var(--text-muted)'
+    color: 'var(--text-muted)',
+    maxWidth: '120px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  dropdown: {
+    position: 'absolute',
+    top: 'calc(100% + 8px)',
+    right: 0,
+    backgroundColor: 'var(--panel-bg)',
+    border: '1px solid var(--border-color)',
+    borderRadius: '10px',
+    minWidth: '200px',
+    zIndex: 150,
+    overflow: 'hidden',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+  },
+  dropdownHeader: {
+    padding: '12px 14px',
+  },
+  dropdownName: {
+    fontSize: '0.9rem',
+    fontWeight: '600',
+    color: 'var(--text-main)',
+    fontFamily: 'var(--font-body)',
+    marginBottom: '2px',
+  },
+  dropdownEmail: {
+    fontSize: '0.78rem',
+    color: 'var(--text-muted)',
+    fontFamily: 'var(--font-body)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  dropdownDivider: {
+    height: '1px',
+    backgroundColor: 'var(--border-color)',
+  },
+  dropdownItem: {
+    display: 'flex',
+    alignItems: 'center',
+    width: '100%',
+    padding: '10px 14px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    color: 'var(--text-muted)',
+    fontSize: '0.88rem',
+    fontFamily: 'var(--font-body)',
+    cursor: 'pointer',
+    textAlign: 'left',
   },
   iconBtn: {
     background: 'transparent',

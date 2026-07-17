@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { Copy, Check, RotateCcw, AlertCircle, Send } from 'lucide-react';
+import { Copy, Check, RotateCcw, AlertCircle } from 'lucide-react';
 import { platforms } from '../platforms';
 import { useTranslation } from '../hooks/useTranslation';
 
-export default function OutputCard({ platformId, output, loading, error, onRetry, onPublish }) {
+export default function OutputCard({ platformId, output, loading, error, onRetry }) {
   const [copied, setCopied] = useState(false);
   const platform = platforms[platformId];
   const t = useTranslation();
@@ -15,7 +15,7 @@ export default function OutputCard({ platformId, output, loading, error, onRetry
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const canPublish = !!output && !loading && !error;
+  const canShowFooter = !!output && !loading && !error;
 
   const charInfo = useMemo(() => {
     if (!output || !platform.charLimit) return null;
@@ -46,12 +46,8 @@ export default function OutputCard({ platformId, output, loading, error, onRetry
           onClick={handleCopy}
           disabled={!output || loading}
           title={t.copyToClipboard}
-          onMouseEnter={(e) => {
-            if (output && !loading) e.currentTarget.style.opacity = '0.7';
-          }}
-          onMouseLeave={(e) => {
-            if (output && !loading) e.currentTarget.style.opacity = '1';
-          }}
+          onMouseEnter={(e) => { if (output && !loading) e.currentTarget.style.opacity = '0.7'; }}
+          onMouseLeave={(e) => { if (output && !loading) e.currentTarget.style.opacity = '1'; }}
         >
           {copied ? <Check size={18} color={platform.color} /> : <Copy size={18} color={platform.color} />}
         </button>
@@ -86,13 +82,11 @@ export default function OutputCard({ platformId, output, loading, error, onRetry
         )}
 
         {!loading && !output && !error && (
-          <div style={styles.emptyState}>
-            {t.readyToGenerate}
-          </div>
+          <div style={styles.emptyState}>{t.readyToGenerate}</div>
         )}
       </div>
 
-      {canPublish && (
+      {canShowFooter && (
         <div style={styles.footer}>
           <button
             style={styles.regenBtn}
@@ -112,22 +106,6 @@ export default function OutputCard({ platformId, output, loading, error, onRetry
                 : `${charInfo.len} / ${charInfo.limit}`}
             </span>
           )}
-
-          <button
-            style={{ ...styles.publishBtn, borderColor: platform.color, color: platform.color }}
-            onClick={onPublish}
-            onMouseEnter={e => {
-              e.currentTarget.style.backgroundColor = platform.color;
-              e.currentTarget.style.color = '#fff';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.color = platform.color;
-            }}
-          >
-            <Send size={13} style={{ marginRight: '6px' }} />
-            {t.publish}
-          </button>
         </div>
       )}
     </div>
@@ -266,19 +244,5 @@ const styles = {
     fontFamily: 'var(--font-body)',
     fontWeight: '500',
     whiteSpace: 'nowrap',
-  },
-  publishBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderRadius: '6px',
-    padding: '7px 14px',
-    fontSize: '0.85rem',
-    fontWeight: '600',
-    fontFamily: 'var(--font-body)',
-    cursor: 'pointer',
-    transition: 'all 0.15s',
   },
 };

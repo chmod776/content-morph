@@ -1,0 +1,45 @@
+
+Project: upgrade my "Content Morph" app
+
+This is a Vite + React app that turns a note into platform-ready posts (Twitter/X, LinkedIn, Instagram, YouTube) by calling OpenAI (gpt-4o-mini) directly from the browser and streaming the results. The current prototype uses Supabase email/password auth and is frontend-only. I want you to make the following changes. Keep everything that isn't explicitly changed.
+
+1. REMOVE these features completely
+Scheduled posting — delete src/components/SchedulePanel.jsx, all scheduling state/handlers, the contentmorph-scheduled localStorage usage, the schedule/calendar button in the header, and the 30-second interval that fires scheduled posts.
+In-platform publishing — delete src/components/PublishModal.jsx, the "Publish" button on each output card, and the "Publish All" button in the results header. Users will just copy the text and paste it themselves, so keep the copy button.
+The "Share link" (chain) icon in the input header — it does nothing; remove it.
+Supabase email/password authentication — remove the email/password login/signup UI and the Supabase auth logic (src/lib/supabase.js and Supabase calls in AuthContext). Replace it with Google sign-in (see below).
+2. REPLACE auth with Google sign-in only
+The only way to log in is "Continue with Google." No passwords, no email confirmation.
+Use Replit's built-in authentication (Replit Auth) with Google as the provider — or Supabase Google OAuth if that's simpler. Pick whichever is most reliable on Replit.
+Gate the whole app: logged-out users see a clean sign-in screen with a single "Continue with Google" button; logged-in users see the app.
+Add a small account menu in the header showing the user's name/email with a Sign out option.
+Store the auth token client-side and send it on API calls (avoid relying on third-party cookies so it works inside embedded preview iframes).
+3. ADD a lightweight backend + per-user database
+The prototype is frontend-only. Add a small backend (any stack Replit prefers — e.g. Node/Express or Python/FastAPI) plus a database to store a per-user voice profile. Expose these authenticated endpoints:
+
+GET /api/profile → returns { brand_voice, writing_samples[], onboarded } for the logged-in user.
+PUT /api/profile → updates brand_voice (string), writing_samples (array, max 3, drop empties), onboarded (bool).
+POST /api/profile/extract-text → accepts an uploaded file (.txt, .md, .pdf, .docx, max 5MB) and returns { text } (extracted plain text). Reject other file types with a clear error.
+Auth endpoints for the Google login/session/logout as needed by the chosen auth method.
+4. ADD a first-login onboarding tutorial
+On a user's first login (when onboarded is false), show a multi-step modal:
+Welcome — one-line intro to Content Morph + what the next steps do. Include a "Skip for now" option.
+Set your voice — a textarea where the user describes how they want to sound (tone/style).
+Writing samples — let the user add up to 3 samples of their own writing, each either pasted into a textarea OR uploaded as a file (.txt/.md/.pdf/.docx, extracted via /api/profile/extract-text).
+Done — confirmation that points them to the Settings (gear) icon in the top-right where they can edit this anytime; briefly pulse/highlight the gear after the modal closes.
+Saving the last step writes brand_voice, writing_samples, and onboarded=true to the profile. Skipping just sets onboarded=true. The modal must not reappear on reload once onboarded (make sure the "already onboarded" check waits for auth + profile to finish loading before deciding).
+5. ADD voice + writing samples to Settings
+In SettingsPanel, add a "Your Voice" textarea and a "Writing Samples" section (reuse the same paste-or-upload editor from onboarding, max 3). Both save to the account via PUT /api/profile.
+Move brand voice from localStorage to the account-backed profile so it persists across devices/logins.
+6. USE the voice profile in generation
+When building the system prompt for each platform, prepend a brand-voice override using brand_voice, and append the user's writing samples with an instruction to mimic their voice/tone/rhythm/vocabulary (not copy their content). Combine both so the output sounds like the user. Keep the existing per-platform prompts, character limits, streaming, and language/length settings.
+7. KEEP everything else working (do not break)
+Note input + "Transform" generation with live streaming into each platform card.
+Platform selector (Twitter/X, LinkedIn, Instagram, YouTube), per-card copy + regenerate, character counters, the multi-language i18n system, dark/light theme, and the generation history panel (localStorage is fine).
+Keep the existing visual design (Fraunces / DM Mono / Outfit fonts, dark theme, accent colors).
+Acceptance criteria
+Logged-out → Google sign-in screen only. Google login → lands in the app.
+Brand-new user → onboarding modal appears; completing or skipping it never shows it again on reload.
+Voice + up to 3 writing samples (paste or file upload) save to the account and survive logout/login.
+Generated posts reflect the saved voice and samples.
+No scheduling, no in-platform publishing, no share-link icon anywhere.
