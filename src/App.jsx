@@ -252,7 +252,7 @@ export default function App() {
 
       <footer style={styles.footer}>
         <span style={styles.footerText}>Questions or feedback? Reach out at </span>
-        <a href="mailto:contentmorph71@gmail.com" style={styles.footerLink}>contentmorph71@gmail.com</a>
+        <a href="mailto:contentmorph71@gmail.com" style={styles.footerLink} target="_top">contentmorph71@gmail.com</a>
       </footer>
 
       <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
