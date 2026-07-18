@@ -178,7 +178,7 @@ export default function SettingsPanel({ isOpen, onClose }) {
               <BookOpen size={16} style={{ marginRight: '8px', color: 'var(--text-muted)' }} />
               <h3 style={styles.sectionTitle}>Writing Samples</h3>
             </div>
-            <p style={styles.sectionDesc}>Up to 3 examples of your own writing. Content Morph will mimic your voice and rhythm — not your content.</p>
+            <p style={styles.sectionDesc}>Up to 3 examples of your own writing. Content Morph will mimic your voice and rhythm, not your content.</p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '12px' }}>
               {draftSamples.map((s, idx) => (
