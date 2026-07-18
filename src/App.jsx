@@ -220,17 +220,6 @@ export default function App() {
     fetch('/api/history', { method: 'DELETE', credentials: 'include' }).catch(() => {});
   };
 
-  const handleSave = () => {
-    if (!input.trim()) return;
-    const blob = new Blob([input], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'content-morph-draft.txt';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   const isGenerating = Object.values(loadingStates).some(state => state);
 
   return (
@@ -241,7 +230,6 @@ export default function App() {
           setInput={setInput}
           isGenerating={isGenerating}
           onGenerate={handleGenerate}
-          onSave={handleSave}
           onSettingsOpen={() => setSettingsOpen(true)}
           onHistoryOpen={() => setHistoryOpen(true)}
           historyCount={history.length}

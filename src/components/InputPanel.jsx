@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Save, History, Settings, LogOut, ChevronDown, User } from 'lucide-react';
+import { Send, History, Settings, LogOut, ChevronDown, User } from 'lucide-react';
 import { useTranslation } from '../hooks/useTranslation';
 import { useAuth } from '../context/AuthContext';
 
-export default function InputPanel({ input, setInput, isGenerating, onGenerate, onSave, onSettingsOpen, onHistoryOpen, historyCount, settingsRef, gearPulse }) {
+export default function InputPanel({ input, setInput, isGenerating, onGenerate, onSettingsOpen, onHistoryOpen, historyCount, settingsRef, gearPulse }) {
   const t = useTranslation();
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -96,20 +96,6 @@ export default function InputPanel({ input, setInput, isGenerating, onGenerate, 
         />
         <div style={styles.footer}>
           <span style={styles.charCount}>{input.length} {t.characters}</span>
-
-          <button
-            style={{
-              ...styles.saveBtn,
-              opacity: !input.trim() ? 0.4 : 1,
-              cursor: !input.trim() ? 'not-allowed' : 'pointer'
-            }}
-            onClick={onSave}
-            disabled={!input.trim()}
-            title={t.save}
-          >
-            <Save size={15} style={{ marginRight: '6px' }} />
-            {t.save}
-          </button>
 
           <button
             style={{
@@ -316,19 +302,6 @@ const styles = {
     fontSize: '1rem',
     fontWeight: '500',
     marginRight: 'auto'
-  },
-  saveBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-    color: 'var(--text-muted)',
-    border: '1px solid var(--border-color)',
-    padding: '10px 20px',
-    borderRadius: '4px',
-    fontWeight: '500',
-    fontSize: '1rem',
-    fontFamily: 'var(--font-body)',
-    transition: 'all 0.2s ease'
   },
   transformBtn: {
     display: 'flex',
