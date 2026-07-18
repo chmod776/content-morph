@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, RotateCcw, Trash2, Clock, ChevronRight } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { X, RotateCcw, Trash2, Clock, ChevronRight, Search } from 'lucide-react';
 import { platforms } from '../platforms';
 import { useTranslation } from '../hooks/useTranslation';
 
@@ -19,7 +19,25 @@ function timeAgo(createdAt, id) {
 
 export default function HistoryPanel({ isOpen, onClose, history, onRestore, onClear, onDelete }) {
   const [expandedId, setExpandedId] = useState(null);
+  const [search, setSearch]         = useState('');
+  const [filterPlatform, setFilterPlatform] = useState(null);
   const t = useTranslation();
+
+  const allPlatformIds = useMemo(() => {
+    const ids = new Set();
+    history.forEach(e => e.selectedPlatforms.forEach(p => ids.add(p)));
+    return [...ids];
+  }, [history]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return history.filter(e => {
+      const matchText = !q || e.input.toLowerCase().includes(q) ||
+        Object.values(e.outputs || {}).some(o => o.toLowerCase().includes(q));
+      const matchPlatform = !filterPlatform || e.selectedPlatforms.includes(filterPlatform);
+      return matchText && matchPlatform;
+    });
+  }, [history, search, filterPlatform]);
 
   if (!isOpen) return null;
 
@@ -45,6 +63,49 @@ export default function HistoryPanel({ isOpen, onClose, history, onRestore, onCl
           </div>
         </div>
 
+        {history.length > 0 && (
+          <div style={styles.filters}>
+            <div style={styles.searchWrap}>
+              <Search size={13} style={styles.searchIcon} />
+              <input
+                style={styles.searchInput}
+                placeholder="Search history…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+              {search && (
+                <button style={styles.searchClear} onClick={() => setSearch('')}>
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+            {allPlatformIds.length > 1 && (
+              <div style={styles.platformFilters}>
+                <button
+                  style={{ ...styles.filterPill, ...(filterPlatform === null ? styles.filterPillActive : {}) }}
+                  onClick={() => setFilterPlatform(null)}
+                >
+                  All
+                </button>
+                {allPlatformIds.map(id => (
+                  <button
+                    key={id}
+                    style={{
+                      ...styles.filterPill,
+                      ...(filterPlatform === id ? styles.filterPillActive : {}),
+                      borderColor: filterPlatform === id ? (platforms[id]?.color || 'var(--text-main)') : 'var(--border-color)',
+                      color: filterPlatform === id ? (platforms[id]?.color || 'var(--text-main)') : 'var(--text-muted)',
+                    }}
+                    onClick={() => setFilterPlatform(filterPlatform === id ? null : id)}
+                  >
+                    {platforms[id]?.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <div style={styles.body}>
           {history.length === 0 ? (
             <div style={styles.empty}>
@@ -52,9 +113,15 @@ export default function HistoryPanel({ isOpen, onClose, history, onRestore, onCl
               <p style={styles.emptyTitle}>{t.noHistoryTitle}</p>
               <p style={styles.emptyDesc}>{t.noHistoryDesc}</p>
             </div>
+          ) : filtered.length === 0 ? (
+            <div style={styles.empty}>
+              <Search size={28} style={{ marginBottom: '12px', opacity: 0.3 }} />
+              <p style={styles.emptyTitle}>No results</p>
+              <p style={styles.emptyDesc}>Try a different keyword or clear the filter.</p>
+            </div>
           ) : (
             <div style={styles.list}>
-              {history.map(entry => {
+              {filtered.map(entry => {
                 const isExpanded = expandedId === entry.id;
                 const platformNames = entry.selectedPlatforms.map(id => platforms[id]?.name).filter(Boolean);
                 const preview = entry.input.length > 80 ? entry.input.slice(0, 80) + '...' : entry.input;
@@ -200,6 +267,65 @@ const styles = {
     margin: 0,
     fontSize: '0.88rem',
     lineHeight: '1.6',
+  },
+  filters: {
+    padding: '12px 20px',
+    borderBottom: '1px solid var(--border-color)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  searchWrap: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  searchIcon: {
+    position: 'absolute',
+    left: '10px',
+    color: 'var(--text-muted)',
+    pointerEvents: 'none',
+  },
+  searchInput: {
+    width: '100%',
+    backgroundColor: 'var(--bg-color)',
+    color: 'var(--text-main)',
+    border: '1px solid var(--border-color)',
+    borderRadius: '8px',
+    padding: '8px 32px 8px 30px',
+    fontSize: '0.88rem',
+    fontFamily: 'var(--font-body)',
+    outline: 'none',
+  },
+  searchClear: {
+    position: 'absolute',
+    right: '8px',
+    background: 'transparent',
+    border: 'none',
+    color: 'var(--text-muted)',
+    cursor: 'pointer',
+    display: 'flex',
+    padding: '2px',
+  },
+  platformFilters: {
+    display: 'flex',
+    gap: '6px',
+    flexWrap: 'wrap',
+  },
+  filterPill: {
+    padding: '3px 10px',
+    borderRadius: '20px',
+    border: '1px solid var(--border-color)',
+    background: 'transparent',
+    color: 'var(--text-muted)',
+    fontSize: '0.75rem',
+    fontFamily: 'var(--font-body)',
+    cursor: 'pointer',
+    transition: 'all 0.15s',
+  },
+  filterPillActive: {
+    borderColor: 'var(--text-main)',
+    color: 'var(--text-main)',
   },
   list: {
     display: 'flex',
