@@ -250,6 +250,11 @@ export default function App() {
         />
       </main>
 
+      <footer style={styles.footer}>
+        <span style={styles.footerText}>Questions or feedback? Reach out at </span>
+        <a href="mailto:contentmorph71@gmail.com" style={styles.footerLink}>contentmorph71@gmail.com</a>
+      </footer>
+
       <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <HistoryPanel
         isOpen={historyOpen}
@@ -342,5 +347,24 @@ const styles = {
     fontFamily: 'var(--font-body)',
     fontWeight: '600',
     cursor: 'pointer',
+  },
+  footer: {
+    marginTop: '48px',
+    paddingTop: '20px',
+    borderTop: '1px solid var(--border-color)',
+    textAlign: 'center',
+  },
+  footerText: {
+    fontSize: '0.85rem',
+    color: 'var(--text-muted)',
+    fontFamily: 'var(--font-body)',
+  },
+  footerLink: {
+    fontSize: '0.85rem',
+    color: 'var(--text-muted)',
+    fontFamily: 'var(--font-body)',
+    textDecoration: 'underline',
+    textDecorationColor: 'var(--border-color)',
+    transition: 'color 0.2s ease',
   },
 };
