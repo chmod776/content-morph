@@ -32,6 +32,7 @@ export default function App() {
   const [showOnboarding, setShowOnboarding]     = useState(false);
   const [gearPulse, setGearPulse]               = useState(false);
   const [showSkipAlert, setShowSkipAlert]       = useState(false);
+  const [emailCopied, setEmailCopied]           = useState(false);
 
   // Load history from the database on mount
   useEffect(() => {
@@ -252,7 +253,16 @@ export default function App() {
 
       <footer style={styles.footer}>
         <span style={styles.footerText}>Questions or feedback? Reach out at </span>
-        <a href="mailto:contentmorph71@gmail.com" style={styles.footerLink} target="_top">contentmorph71@gmail.com</a>
+        <button
+          style={styles.footerLink}
+          onClick={() => {
+            navigator.clipboard.writeText('contentmorph71@gmail.com');
+            setEmailCopied(true);
+            setTimeout(() => setEmailCopied(false), 2000);
+          }}
+        >
+          {emailCopied ? '✓ Copied!' : 'contentmorph71@gmail.com'}
+        </button>
       </footer>
 
       <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
@@ -366,5 +376,9 @@ const styles = {
     textDecoration: 'underline',
     textDecorationColor: 'var(--border-color)',
     transition: 'color 0.2s ease',
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    cursor: 'pointer',
   },
 };
