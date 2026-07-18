@@ -1,0 +1,233 @@
+import React, { useState } from 'react';
+
+export default function PricingPage({ user, onLogout }) {
+  const [billing, setBilling] = useState('monthly');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const price = billing === 'monthly' ? '$9.99/month' : '$79.99/year';
+  const savings = billing === 'yearly' ? 'Save 33%' : null;
+
+  const handleSubscribe = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interval: billing === 'monthly' ? 'month' : 'year' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to create checkout session');
+      window.location.href = data.url;
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={styles.page}>
+      <div style={styles.card}>
+        <h1 style={styles.logo}>Content Morph</h1>
+        <p style={styles.tagline}>Transform your raw notes into platform-ready posts.</p>
+
+        <div style={styles.toggleRow}>
+          <button
+            style={{ ...styles.toggleBtn, ...(billing === 'monthly' ? styles.toggleActive : {}) }}
+            onClick={() => setBilling('monthly')}
+          >Monthly</button>
+          <button
+            style={{ ...styles.toggleBtn, ...(billing === 'yearly' ? styles.toggleActive : {}) }}
+            onClick={() => setBilling('yearly')}
+          >
+            Yearly
+            {savings && <span style={styles.savingsBadge}>{savings}</span>}
+          </button>
+        </div>
+
+        <div style={styles.priceBox}>
+          <span style={styles.priceAmount}>{price}</span>
+        </div>
+
+        <ul style={styles.featureList}>
+          {[
+            'Unlimited content generations',
+            'All platforms — LinkedIn, Twitter, Instagram & more',
+            'Brand voice & writing samples',
+            'Generation history',
+            'Cancel anytime',
+          ].map(f => (
+            <li key={f} style={styles.featureItem}>
+              <span style={styles.check}>✓</span> {f}
+            </li>
+          ))}
+        </ul>
+
+        {error && <p style={styles.error}>{error}</p>}
+
+        <button style={styles.subscribeBtn} onClick={handleSubscribe} disabled={loading}>
+          {loading ? 'Redirecting…' : 'Subscribe now'}
+        </button>
+
+        <p style={styles.secureNote}>Secured by Stripe · Cancel anytime</p>
+
+        <div style={styles.footer}>
+          <span style={styles.footerText}>Signed in as {user?.email}</span>
+          <button style={styles.logoutBtn} onClick={onLogout}>Sign out</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const styles = {
+  page: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '40px 20px',
+    fontFamily: 'var(--font-body)',
+  },
+  card: {
+    width: '100%',
+    maxWidth: '420px',
+    backgroundColor: 'var(--panel-bg)',
+    border: '1px solid var(--border-color)',
+    borderRadius: '20px',
+    padding: '48px 40px',
+    textAlign: 'center',
+  },
+  logo: {
+    fontFamily: 'var(--font-heading)',
+    fontSize: '2rem',
+    color: 'var(--text-main)',
+    margin: '0 0 8px',
+  },
+  tagline: {
+    fontSize: '0.92rem',
+    color: 'var(--text-muted)',
+    margin: '0 0 32px',
+    lineHeight: '1.5',
+  },
+  toggleRow: {
+    display: 'flex',
+    backgroundColor: 'var(--bg-color)',
+    borderRadius: '10px',
+    padding: '4px',
+    marginBottom: '28px',
+    gap: '4px',
+  },
+  toggleBtn: {
+    flex: 1,
+    padding: '8px 0',
+    border: 'none',
+    borderRadius: '7px',
+    background: 'transparent',
+    color: 'var(--text-muted)',
+    fontSize: '0.88rem',
+    fontFamily: 'var(--font-body)',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    transition: 'all 0.15s ease',
+  },
+  toggleActive: {
+    backgroundColor: 'var(--panel-bg)',
+    color: 'var(--text-main)',
+    fontWeight: '600',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+  },
+  savingsBadge: {
+    fontSize: '0.7rem',
+    backgroundColor: 'var(--text-main)',
+    color: 'var(--bg-color)',
+    padding: '2px 6px',
+    borderRadius: '99px',
+    fontWeight: '700',
+  },
+  priceBox: {
+    marginBottom: '28px',
+  },
+  priceAmount: {
+    fontSize: '2.2rem',
+    fontWeight: '700',
+    color: 'var(--text-main)',
+    fontFamily: 'var(--font-heading)',
+  },
+  featureList: {
+    listStyle: 'none',
+    padding: 0,
+    margin: '0 0 32px',
+    textAlign: 'left',
+  },
+  featureItem: {
+    fontSize: '0.9rem',
+    color: 'var(--text-muted)',
+    padding: '6px 0',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    borderBottom: '1px solid var(--border-color)',
+  },
+  check: {
+    color: 'var(--text-main)',
+    fontWeight: '700',
+    flexShrink: 0,
+  },
+  error: {
+    color: '#e05c5c',
+    fontSize: '0.85rem',
+    marginBottom: '16px',
+  },
+  subscribeBtn: {
+    width: '100%',
+    padding: '14px',
+    backgroundColor: 'var(--text-main)',
+    color: 'var(--bg-color)',
+    border: 'none',
+    borderRadius: '10px',
+    fontSize: '1rem',
+    fontWeight: '700',
+    fontFamily: 'var(--font-body)',
+    cursor: 'pointer',
+    marginBottom: '12px',
+    transition: 'opacity 0.2s ease',
+  },
+  secureNote: {
+    fontSize: '0.78rem',
+    color: 'var(--text-muted)',
+    margin: '0 0 28px',
+    opacity: 0.6,
+  },
+  footer: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: '20px',
+    borderTop: '1px solid var(--border-color)',
+  },
+  footerText: {
+    fontSize: '0.8rem',
+    color: 'var(--text-muted)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    maxWidth: '220px',
+  },
+  logoutBtn: {
+    background: 'none',
+    border: 'none',
+    color: 'var(--text-muted)',
+    fontSize: '0.8rem',
+    fontFamily: 'var(--font-body)',
+    cursor: 'pointer',
+    textDecoration: 'underline',
+    padding: 0,
+    flexShrink: 0,
+  },
+};

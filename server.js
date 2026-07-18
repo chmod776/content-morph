@@ -10,6 +10,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import memoize from 'memoizee';
+import { runMigrations } from 'stripe-replit-sync';
+import { getStripeSync, getUncachableStripeClient } from './stripeClient.js';
+import { WebhookHandlers } from './webhookHandlers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -28,14 +31,18 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS IDX_session_expire ON sessions(expire);
 
     CREATE TABLE IF NOT EXISTS users (
-      id                TEXT PRIMARY KEY,
-      email             TEXT UNIQUE,
-      first_name        TEXT,
-      last_name         TEXT,
-      profile_image_url TEXT,
-      created_at        TIMESTAMP DEFAULT NOW(),
-      updated_at        TIMESTAMP DEFAULT NOW()
+      id                     TEXT PRIMARY KEY,
+      email                  TEXT UNIQUE,
+      first_name             TEXT,
+      last_name              TEXT,
+      profile_image_url      TEXT,
+      stripe_customer_id     TEXT,
+      stripe_subscription_id TEXT,
+      created_at             TIMESTAMP DEFAULT NOW(),
+      updated_at             TIMESTAMP DEFAULT NOW()
     );
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT;
 
     CREATE TABLE IF NOT EXISTS profiles (
       user_id         TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -195,6 +202,20 @@ const isAuthenticated = async (req, res, next) => {
   }
 };
 
+// ── Stripe webhook (MUST be before express.json) ─────────────────────────────
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const signature = req.headers['stripe-signature'];
+  if (!signature) return res.status(400).json({ error: 'Missing stripe-signature' });
+  try {
+    const sig = Array.isArray(signature) ? signature[0] : signature;
+    await WebhookHandlers.processWebhook(req.body, sig);
+    res.status(200).json({ received: true });
+  } catch (err) {
+    console.error('Webhook error:', err.message);
+    res.status(400).json({ error: 'Webhook processing error' });
+  }
+});
+
 // ── JSON body parser ──────────────────────────────────────────────────────────
 app.use(express.json());
 
@@ -336,6 +357,88 @@ app.delete('/api/history', isAuthenticated, async (req, res) => {
   }
 });
 
+// ── GET /api/stripe/subscription ─────────────────────────────────────────────
+app.get('/api/stripe/subscription', isAuthenticated, async (req, res) => {
+  try {
+    const userId = req.user.claims.sub;
+    const { rows } = await pool.query('SELECT stripe_customer_id FROM users WHERE id=$1', [userId]);
+    const customerId = rows[0]?.stripe_customer_id;
+    if (!customerId) return res.json({ active: false });
+
+    const result = await pool.query(`
+      SELECT status FROM stripe.subscriptions
+      WHERE customer = $1
+      ORDER BY created DESC LIMIT 1
+    `, [customerId]);
+
+    const status = result.rows[0]?.status;
+    res.json({ active: status === 'active' || status === 'trialing', status: status || null });
+  } catch (err) {
+    console.error('Subscription check error:', err.message);
+    res.json({ active: false });
+  }
+});
+
+// ── POST /api/stripe/checkout ─────────────────────────────────────────────────
+app.post('/api/stripe/checkout', isAuthenticated, async (req, res) => {
+  try {
+    const userId = req.user.claims.sub;
+    const { interval } = req.body;
+    const stripe = await getUncachableStripeClient();
+
+    const { rows } = await pool.query('SELECT email, stripe_customer_id FROM users WHERE id=$1', [userId]);
+    const user = rows[0];
+    let customerId = user?.stripe_customer_id;
+
+    if (!customerId) {
+      const customer = await stripe.customers.create({ email: user?.email, metadata: { userId } });
+      customerId = customer.id;
+      await pool.query('UPDATE users SET stripe_customer_id=$1 WHERE id=$2', [customerId, userId]);
+    }
+
+    const prices = await stripe.prices.list({ active: true, type: 'recurring', expand: ['data.product'] });
+    const match = prices.data.find(p => p.recurring?.interval === (interval === 'year' ? 'year' : 'month'));
+    if (!match) return res.status(404).json({ message: 'No matching price found. Please run the seed script.' });
+
+    const baseUrl = `https://${process.env.REPLIT_DEV_DOMAIN || req.get('host')}`;
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      payment_method_types: ['card'],
+      line_items: [{ price: match.id, quantity: 1 }],
+      mode: 'subscription',
+      success_url: `${baseUrl}/?checkout=success`,
+      cancel_url: `${baseUrl}/?checkout=cancel`,
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error('Checkout error:', err.message);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ── POST /api/stripe/portal ───────────────────────────────────────────────────
+app.post('/api/stripe/portal', isAuthenticated, async (req, res) => {
+  try {
+    const userId = req.user.claims.sub;
+    const { rows } = await pool.query('SELECT stripe_customer_id FROM users WHERE id=$1', [userId]);
+    const customerId = rows[0]?.stripe_customer_id;
+    if (!customerId) return res.status(400).json({ message: 'No billing account found' });
+
+    const stripe = await getUncachableStripeClient();
+    const baseUrl = `https://${process.env.REPLIT_DEV_DOMAIN || req.get('host')}`;
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: baseUrl,
+    });
+
+    res.json({ url: portalSession.url });
+  } catch (err) {
+    console.error('Portal error:', err.message);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // ── POST /api/profile/extract-text ────────────────────────────────────────────
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -382,12 +485,36 @@ if (process.env.NODE_ENV === 'production') {
   app.get('*', (_, res) => res.sendFile(path.join(distPath, 'index.html')));
 }
 
+// ── Stripe init ───────────────────────────────────────────────────────────────
+async function initStripe() {
+  try {
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) throw new Error('DATABASE_URL required');
+
+    console.log('Running Stripe migrations...');
+    await runMigrations({ databaseUrl });
+    console.log('Stripe schema ready');
+
+    const stripeSync = await getStripeSync();
+    const webhookBaseUrl = `https://${process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+    await stripeSync.findOrCreateManagedWebhook(`${webhookBaseUrl}/api/stripe/webhook`);
+    console.log('Stripe webhook configured');
+
+    stripeSync.syncBackfill()
+      .then(() => console.log('Stripe data synced'))
+      .catch(err => console.error('Stripe backfill error:', err.message));
+  } catch (err) {
+    console.error('Stripe init error (non-fatal):', err.message);
+  }
+}
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 initDb()
+  .then(() => initStripe())
   .then(() => {
     app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
   })
   .catch(err => {
-    console.error('Failed to init DB:', err);
+    console.error('Failed to init:', err);
     process.exit(1);
   });
