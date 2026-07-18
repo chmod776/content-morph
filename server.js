@@ -45,6 +45,16 @@ async function initDb() {
       created_at      TIMESTAMP DEFAULT NOW(),
       updated_at      TIMESTAMP DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS history (
+      id                SERIAL PRIMARY KEY,
+      user_id           TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      input             TEXT NOT NULL,
+      selected_platforms JSONB NOT NULL DEFAULT '[]',
+      outputs           JSONB NOT NULL DEFAULT '{}',
+      created_at        TIMESTAMP DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_history_user_id ON history(user_id);
   `);
 }
 
@@ -255,6 +265,71 @@ app.put('/api/profile', isAuthenticated, async (req, res) => {
       writing_samples: p.writing_samples || [],
       onboarded: p.onboarded || false,
     });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ── GET /api/history ──────────────────────────────────────────────────────────
+app.get('/api/history', isAuthenticated, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM history WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50',
+      [req.user.claims.sub]
+    );
+    res.json(rows.map(r => ({
+      id: r.id,
+      input: r.input,
+      selectedPlatforms: r.selected_platforms,
+      outputs: r.outputs,
+      createdAt: r.created_at,
+    })));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ── POST /api/history ─────────────────────────────────────────────────────────
+app.post('/api/history', isAuthenticated, async (req, res) => {
+  try {
+    const { input, selectedPlatforms, outputs } = req.body;
+    if (!input || !selectedPlatforms || !outputs) {
+      return res.status(400).json({ message: 'Missing fields' });
+    }
+    const { rows } = await pool.query(
+      `INSERT INTO history (user_id, input, selected_platforms, outputs)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [req.user.claims.sub, input, JSON.stringify(selectedPlatforms), JSON.stringify(outputs)]
+    );
+    const r = rows[0];
+    res.json({ id: r.id, input: r.input, selectedPlatforms: r.selected_platforms, outputs: r.outputs, createdAt: r.created_at });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ── DELETE /api/history/:id ───────────────────────────────────────────────────
+app.delete('/api/history/:id', isAuthenticated, async (req, res) => {
+  try {
+    await pool.query(
+      'DELETE FROM history WHERE id=$1 AND user_id=$2',
+      [req.params.id, req.user.claims.sub]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ── DELETE /api/history ───────────────────────────────────────────────────────
+app.delete('/api/history', isAuthenticated, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM history WHERE user_id=$1', [req.user.claims.sub]);
+    res.json({ ok: true });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

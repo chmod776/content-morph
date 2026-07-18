@@ -13,15 +13,6 @@ import { useAuth } from './context/AuthContext';
 
 const MAX_HISTORY = 50;
 
-function loadHistory() {
-  try { return JSON.parse(localStorage.getItem('contentmorph-history') || '[]'); }
-  catch { return []; }
-}
-
-function saveHistory(h) {
-  localStorage.setItem('contentmorph-history', JSON.stringify(h));
-}
-
 export default function App() {
   const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
   const { settings } = useSettings();
@@ -36,10 +27,20 @@ export default function App() {
   const [errors, setErrors]                     = useState({});
   const [settingsOpen, setSettingsOpen]         = useState(false);
   const [historyOpen, setHistoryOpen]           = useState(false);
-  const [history, setHistory]                   = useState(loadHistory);
+  const [history, setHistory]                   = useState([]);
+  const [historyLoading, setHistoryLoading]     = useState(true);
   const [showOnboarding, setShowOnboarding]     = useState(false);
   const [gearPulse, setGearPulse]               = useState(false);
   const [showSkipAlert, setShowSkipAlert]       = useState(false);
+
+  // Load history from the database on mount
+  useEffect(() => {
+    fetch('/api/history', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setHistory(Array.isArray(data) ? data : []))
+      .catch(() => setHistory([]))
+      .finally(() => setHistoryLoading(false));
+  }, []);
 
   // Show onboarding only once auth + profile are ready and user is not yet onboarded
   useEffect(() => {
@@ -168,12 +169,17 @@ export default function App() {
   };
 
   const addToHistory = (inputText, platforms, completedOutputs) => {
-    const entry = { id: Date.now(), input: inputText, selectedPlatforms: platforms, outputs: completedOutputs };
-    setHistory(prev => {
-      const next = [entry, ...prev].slice(0, MAX_HISTORY);
-      saveHistory(next);
-      return next;
-    });
+    fetch('/api/history', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ input: inputText, selectedPlatforms: platforms, outputs: completedOutputs }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(entry => {
+        if (entry) setHistory(prev => [entry, ...prev].slice(0, MAX_HISTORY));
+      })
+      .catch(() => {});
   };
 
   const handleGenerate = () => {
@@ -205,10 +211,14 @@ export default function App() {
   };
 
   const handleHistoryDelete = (id) => {
-    setHistory(prev => { const next = prev.filter(e => e.id !== id); saveHistory(next); return next; });
+    setHistory(prev => prev.filter(e => e.id !== id));
+    fetch(`/api/history/${id}`, { method: 'DELETE', credentials: 'include' }).catch(() => {});
   };
 
-  const handleHistoryClear = () => { setHistory([]); saveHistory([]); };
+  const handleHistoryClear = () => {
+    setHistory([]);
+    fetch('/api/history', { method: 'DELETE', credentials: 'include' }).catch(() => {});
+  };
 
   const handleSave = () => {
     if (!input.trim()) return;
