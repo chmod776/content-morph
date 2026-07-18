@@ -6,6 +6,7 @@ import OutputGrid from './components/OutputGrid';
 import SettingsPanel from './components/SettingsPanel';
 import HistoryPanel from './components/HistoryPanel';
 import OnboardingModal from './components/OnboardingModal';
+import PricingPage from './components/PricingPage';
 import { platforms } from './platforms';
 import { useSettings } from './context/SettingsContext';
 import { useProfile } from './context/ProfileContext';
@@ -33,6 +34,17 @@ export default function App() {
   const [gearPulse, setGearPulse]               = useState(false);
   const [showSkipAlert, setShowSkipAlert]       = useState(false);
   const [emailCopied, setEmailCopied]           = useState(false);
+  const [subscription, setSubscription]         = useState(null);
+  const [subLoading, setSubLoading]             = useState(true);
+
+  // Check subscription status on mount
+  useEffect(() => {
+    fetch('/api/stripe/subscription', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : { active: false })
+      .then(data => setSubscription(data))
+      .catch(() => setSubscription({ active: false }))
+      .finally(() => setSubLoading(false));
+  }, []);
 
   // Load history from the database on mount
   useEffect(() => {
@@ -222,6 +234,16 @@ export default function App() {
   };
 
   const isGenerating = Object.values(loadingStates).some(state => state);
+
+  // Show paywall if subscription check is done and user isn't subscribed
+  if (!subLoading && subscription && !subscription.active) {
+    return (
+      <PricingPage
+        user={user}
+        onLogout={() => window.location.href = '/api/logout'}
+      />
+    );
+  }
 
   return (
     <div style={styles.layout}>
