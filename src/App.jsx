@@ -263,6 +263,7 @@ export default function App() {
         >
           {emailCopied ? '✓ Copied!' : 'contentmorph71@gmail.com'}
         </button>
+        <p style={styles.footerDisclaimer}>I read everything, but I can't respond to everyone. For billing issues, please use the Stripe customer portal.</p>
       </footer>
 
       <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
@@ -368,6 +369,13 @@ const styles = {
     fontSize: '0.85rem',
     color: 'var(--text-muted)',
     fontFamily: 'var(--font-body)',
+  },
+  footerDisclaimer: {
+    margin: '8px 0 0',
+    fontSize: '0.78rem',
+    color: 'var(--text-muted)',
+    fontFamily: 'var(--font-body)',
+    opacity: 0.6,
   },
   footerLink: {
     fontSize: '0.85rem',
