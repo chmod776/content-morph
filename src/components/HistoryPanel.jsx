@@ -3,15 +3,18 @@ import { X, RotateCcw, Trash2, Clock, ChevronRight } from 'lucide-react';
 import { platforms } from '../platforms';
 import { useTranslation } from '../hooks/useTranslation';
 
-function timeAgo(ts, t) {
+function timeAgo(createdAt, id) {
+  const ts = createdAt ? new Date(createdAt).getTime() : id;
   const diff = Date.now() - ts;
   const mins = Math.floor(diff / 60000);
-  const hrs = Math.floor(diff / 3600000);
+  const hrs  = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
-  if (mins < 1) return t.justNow;
-  if (mins < 60) return t.minutesAgo(mins);
-  if (hrs < 24) return t.hoursAgo(hrs);
-  return t.daysAgo(days);
+  if (mins < 1)  return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  if (hrs  < 24) return `${hrs}h ago`;
+  if (days === 1) return 'Yesterday';
+  if (days  < 7) return `${days} days ago`;
+  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: days > 364 ? 'numeric' : undefined });
 }
 
 export default function HistoryPanel({ isOpen, onClose, history, onRestore, onClear, onDelete }) {
@@ -60,7 +63,7 @@ export default function HistoryPanel({ isOpen, onClose, history, onRestore, onCl
                   <div key={entry.id} style={styles.entry}>
                     <div style={styles.entryHeader} onClick={() => setExpandedId(isExpanded ? null : entry.id)}>
                       <div style={styles.entryMeta}>
-                        <span style={styles.entryTime}>{timeAgo(entry.id, t)}</span>
+                        <span style={styles.entryTime}>{timeAgo(entry.createdAt, entry.id)}</span>
                         <div style={styles.entryPlatforms}>
                           {entry.selectedPlatforms.map(id => (
                             <span key={id} style={{ ...styles.platformDot, backgroundColor: platforms[id]?.color }} />
