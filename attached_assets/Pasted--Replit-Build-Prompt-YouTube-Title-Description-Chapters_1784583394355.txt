@@ -1,0 +1,73 @@
+# Replit Build Prompt: YouTube Title, Description & Chapters Feature
+
+Copy everything below into Replit as your build instructions.
+
+---
+
+## Feature Overview
+
+Add a new content type to Content Morph: **YouTube pre-publish prep**. Users generate a video title, description, and chapters either by (A) uploading a video file, or (B) entering notes/talking points manually — no video required. Both paths feed the same generation engine and respect the user's saved brand voice.
+
+## Two Input Flows
+
+### Flow A — Video Upload
+1. User uploads a video file (not yet posted to YouTube).
+2. Extract the audio track from the video immediately after upload (audio-only, compressed — do not send the raw video file to any transcription service).
+3. Send the extracted audio to a transcription API (e.g. OpenAI Whisper) to generate a transcript.
+4. **Delete the uploaded video file and the extracted audio file immediately after transcription succeeds.** Nothing video/audio-related should persist in storage — only the resulting transcript text (if you choose to keep it) and the final generated output.
+5. Pass the transcript into the generation engine (Flow C below).
+
+### Flow B — No Video, Manual Input
+1. User enters notes, bullet points, or a rough talking-point outline directly into a text field (same UX pattern as the existing "paste your notes" flow elsewhere in the app).
+2. Skip transcription — pass the raw text directly into the generation engine (Flow C below).
+
+### Flow C — Shared Generation Step (used by both flows)
+Using the transcript (Flow A) or manual notes (Flow B) plus the user's saved brand voice profile, generate:
+- **Video title** (concise, platform-appropriate, reflects the user's voice)
+- **Video description** (structured: hook/summary in first 1-2 lines, body, optional links/CTA section — written in the user's voice, not generic)
+- **Chapters/timestamps**, following YouTube's formatting rules:
+  - First timestamp must be exactly `0:00`
+  - Minimum of 3 chapters
+  - Each chapter must be at least 10 seconds apart
+  - Format: `0:00 Chapter Title`, one per line, ready to paste directly into a YouTube description
+
+Note: for Flow B (no video), there's no real timestamp data to anchor chapters to — either omit chapters entirely for this path, or generate a logical section outline without exact timestamps (clearly labeled as a draft structure the user can adjust once the video is edited). Decide which and make the UI copy clear about which mode the user is in.
+
+## Data Handling Rules
+
+**No part of the video or audio is ever stored, at any point, under any circumstances.** This is a hard requirement, not a cleanup step:
+
+- Process the upload in memory or in a temporary/ephemeral location that is never backed up, replicated, logged, or persisted to durable storage (no S3/cloud storage bucket, no database blob, no disk write that survives the request).
+- If a temporary file must touch disk during audio extraction or transcription (e.g. due to library constraints), it must live only in a transient/tmp directory scoped to that single processing job, and must be deleted immediately when the job completes — including on failure, timeout, or crash (use a `finally`/cleanup step, not just a happy-path delete).
+- Do not send the raw video file to any transcription service — extract audio first, and delete the video the moment audio extraction is done, before transcription even starts.
+- Delete the extracted audio the moment transcription returns a result (or errors out).
+- Do not include video/audio file contents, filenames tied to identifiable content, or raw bytes in application logs, error reports, or monitoring/observability tools.
+- The **only** artifact allowed to persist past the request is the text transcript (if you choose to keep it for the user's history) and the final generated title/description/chapters. Nothing video- or audio-shaped should exist anywhere in the system once processing completes.
+- Build in a periodic/automated sweep of the temp storage location as a safety net, in case a cleanup step ever fails silently — nothing should be able to accumulate there even accidentally.
+
+## Usage Cap (Video Processing Only)
+
+Text-based generation (notes, Flow B) stays fully unlimited, matching the rest of the app's pricing model. Video processing (Flow A) gets a **soft monthly cap**, tracked per user:
+
+- **Cap: 6 hours (360 minutes) of video processed per calendar month**, resetting on the user's billing date (not a separate cycle).
+- **Per-video length limit: 90-120 minutes max per single upload**, regardless of remaining monthly balance.
+- **One-time grace, then a hard block until reset:**
+  - Track cumulative minutes processed per user per month.
+  - The **first** upload attempt that would push the user's cumulative total to or over 360 minutes is allowed to process normally — show a friendly warning before they confirm the upload, e.g.: *"You've used your 6 hours of video processing this month — this one will still go through, but you're now over your monthly allotment."*
+  - **Every upload attempt after that grace video is blocked** until the monthly reset (tied to their billing date). Block message should stay friendly and specific, e.g.: *"You've used your video processing for this month — new video uploads will be available again on [reset date]. Everything else in Content Morph, including unlimited text generation, is still available."*
+  - The block applies only to new video processing (Flow A). Text-based generation (Flow B, and the rest of the app) remains fully unlimited and unaffected.
+  - Do not throttle or degrade quality on the grace video — it processes exactly as normal, just with the warning shown first.
+- Surface current usage (e.g. "2.5 / 6 hours used this month") near the upload button, not buried in a separate settings/usage page, so the grace/block behavior is never a surprise.
+
+## UI Requirements
+
+- Clear toggle or two entry points at the start of this feature: "Upload a video" vs. "I don't have a video yet — just notes."
+- Processing state/progress indicator during upload + audio extraction + transcription (this can take a bit for longer videos — don't leave the user staring at a blank screen).
+- Output view: title, description, and chapters each individually copyable, plus a "copy all" option formatted ready to paste into YouTube Studio.
+- If the user has brand voice/writing samples configured, apply it automatically to title and description generation, consistent with how the rest of the app already personalizes output. If they haven't set up brand voice yet, generate in a sensible neutral tone and prompt them to set it up (don't block generation on it).
+
+## Tech Notes
+
+- Use an audio extraction step (e.g. ffmpeg) to pull audio-only from the uploaded video before transcription — this avoids hitting file-size limits on the transcription API and reduces processing time/cost.
+- Transcription: OpenAI Whisper API (or equivalent) — approx. $0.006/min, so cost stays low relative to the monthly cap (a full 6-hour month costs roughly $2 in transcription, well within margin on the existing subscription price).
+- Reuse the existing generation/voice-matching pipeline already built for the notes-to-post feature — the video transcript should just be another input type feeding that same engine, not a separate system.
