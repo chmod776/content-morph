@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { spawn } from 'child_process';
 import crypto from 'crypto';
+import { Readable } from 'stream';
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync, getUncachableStripeClient } from './stripeClient.js';
 import { WebhookHandlers } from './webhookHandlers.js';
@@ -724,7 +725,7 @@ app.post('/api/youtube/generate', isAuthenticated, express.json({ limit: '10mb' 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-    openaiRes.body.pipe(res);
+    Readable.fromWeb(openaiRes.body).pipe(res);
   } catch (err) {
     console.error('YouTube generate error:', err.message);
     res.status(500).json({ error: 'Generation failed' });
@@ -809,7 +810,7 @@ app.post('/api/generate', isAuthenticated, async (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-    openaiRes.body.pipe(res);
+    Readable.fromWeb(openaiRes.body).pipe(res);
   } catch (err) {
     console.error('Generate error:', err.message);
     res.status(500).json({ error: 'Generation failed' });
