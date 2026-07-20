@@ -95,13 +95,6 @@ export default function LandingPage({ onLogin }) {
           Turn rough notes into<br />
           <span style={s.heroAccent}>platform-ready posts</span>
         </h1>
-        <div style={{ ...heroItem(240), display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <button style={s.heroCta} onClick={onLogin}>
-            <GoogleIcon />
-            Get started with Google
-          </button>
-          <p style={s.heroSubNote}>$20.91 / month · Cancel anytime</p>
-        </div>
       </section>
 
       {/* HOW IT WORKS */}
