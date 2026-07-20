@@ -38,14 +38,14 @@ export default function App() {
   const [subscription, setSubscription]         = useState(null);
   const [subLoading, setSubLoading]             = useState(true);
 
-  // Detect ?checkout=success param on return from Stripe
-  const checkoutSuccessRef = useRef(
-    new URLSearchParams(window.location.search).get('checkout') === 'success'
-  );
+  // Detect ?checkout=success or ?checkout=cancel param on return from Stripe
+  const checkoutParam = new URLSearchParams(window.location.search).get('checkout');
+  const checkoutSuccessRef = useRef(checkoutParam === 'success');
+  const checkoutCancelledRef = useRef(checkoutParam === 'cancel');
 
   // Clean the URL param without a page reload
   useEffect(() => {
-    if (checkoutSuccessRef.current) {
+    if (checkoutSuccessRef.current || checkoutCancelledRef.current) {
       const url = new URL(window.location.href);
       url.searchParams.delete('checkout');
       window.history.replaceState({}, '', url.toString());
@@ -275,6 +275,7 @@ export default function App() {
       <PricingPage
         user={user}
         onLogout={logout}
+        checkoutCancelled={checkoutCancelledRef.current}
       />
     );
   }

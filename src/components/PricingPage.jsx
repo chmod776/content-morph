@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { apiFetch } from '../utils/apiFetch';
 
-export default function PricingPage({ user, onLogout }) {
+export default function PricingPage({ user, onLogout, checkoutCancelled }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -47,6 +47,10 @@ export default function PricingPage({ user, onLogout }) {
             </li>
           ))}
         </ul>
+
+        {checkoutCancelled && (
+          <p style={styles.cancelNotice}>Your payment was not completed — try again</p>
+        )}
 
         {error && <p style={styles.error}>{error}</p>}
 
@@ -132,6 +136,15 @@ const styles = {
     color: 'var(--text-main)',
     fontWeight: '700',
     flexShrink: 0,
+  },
+  cancelNotice: {
+    color: '#e05c5c',
+    fontSize: '0.85rem',
+    marginBottom: '16px',
+    padding: '10px 14px',
+    backgroundColor: 'rgba(224, 92, 92, 0.1)',
+    borderRadius: '8px',
+    border: '1px solid rgba(224, 92, 92, 0.25)',
   },
   error: {
     color: '#e05c5c',
