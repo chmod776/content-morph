@@ -19,7 +19,7 @@ export default function LandingPage({ onLogin }) {
 
       {/* HERO */}
       <section style={s.hero}>
-        <div style={s.heroBadge}>AI-powered content creation</div>
+        <div style={s.heroBadge}>Content creation, simplified</div>
         <h1 style={s.heroHeadline}>
           Turn rough notes into<br />
           <span style={s.heroAccent}>platform-ready posts</span>
@@ -42,7 +42,7 @@ export default function LandingPage({ onLogin }) {
           {[
             { n: '1', title: 'Paste your notes', desc: 'Dump your raw ideas, bullet points, or a rough draft — no polish needed.' },
             { n: '2', title: 'Pick your platforms', desc: 'Select LinkedIn, Twitter/X, Instagram, Facebook, or all of them at once.' },
-            { n: '3', title: 'Get ready-to-post content', desc: 'AI rewrites your notes into platform-native copy, streamed live to your screen.' },
+            { n: '3', title: 'Get ready-to-post content', desc: 'Your notes are rewritten into platform-native copy, streamed live to your screen.' },
           ].map(step => (
             <div key={step.n} style={s.step}>
               <div style={s.stepNum}>{step.n}</div>
@@ -61,7 +61,7 @@ export default function LandingPage({ onLogin }) {
             { icon: '✦', title: 'Unlimited generations', desc: 'Run as many generations as you want — no caps, no credits.' },
             { icon: '🎯', title: 'All major platforms', desc: 'LinkedIn, Twitter/X, Instagram, Facebook, YouTube, TikTok, and more.' },
             { icon: '🗣️', title: 'Brand voice', desc: 'Set your tone once. Every post sounds like you, not a robot.' },
-            { icon: '✍️', title: 'Writing samples', desc: 'Upload examples of your writing and the AI mirrors your style exactly.' },
+            { icon: '✍️', title: 'Writing samples', desc: 'Upload examples of your writing and every post mirrors your style exactly.' },
             { icon: '📋', title: 'Generation history', desc: 'Every output is saved so you can revisit, tweak, or repost anything.' },
             { icon: '⚡', title: 'Live streaming output', desc: 'Watch your content appear word by word — no waiting for a wall of text.' },
           ].map(f => (
@@ -89,7 +89,7 @@ export default function LandingPage({ onLogin }) {
               'All platforms — LinkedIn, Twitter, Instagram & more',
               'Brand voice & writing samples',
               'Full generation history',
-              'Streaming AI output',
+              'Live streaming output',
               'Cancel anytime from your account',
             ].map(item => (
               <li key={item} style={s.pricingItem}>
