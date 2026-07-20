@@ -441,6 +441,84 @@ if (process.env.NODE_ENV === 'production') {
   app.get('*', (_, res) => res.sendFile(path.join(distPath, 'index.html')));
 }
 
+// ── POST /api/generate ────────────────────────────────────────────────────────
+// Proxies generation requests to OpenAI server-side so the API key never
+// reaches the browser. Fetches the user's profile from DB to build the full
+// system prompt without trusting client-supplied brand voice data.
+app.post('/api/generate', isAuthenticated, async (req, res) => {
+  const { platformPrompt, content, settings } = req.body;
+  if (!platformPrompt || !content) {
+    return res.status(400).json({ error: 'platformPrompt and content are required' });
+  }
+
+  const openaiKey = process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY;
+  if (!openaiKey) {
+    return res.status(500).json({ error: 'OpenAI API key not configured on server' });
+  }
+
+  // Fetch profile from DB — never trust client-supplied brand voice
+  const profileResult = await pool.query(
+    'SELECT brand_voice, writing_samples FROM profiles WHERE user_id = $1',
+    [req.user.id]
+  );
+  const profile = profileResult.rows[0] || {};
+
+  // Build system prompt (mirrors client-side logic, now authoritative on server)
+  let prompt = platformPrompt;
+  const brandVoice = profile.brand_voice || '';
+  const writingSamples = profile.writing_samples || [];
+
+  if (brandVoice.trim()) {
+    prompt = `BRAND VOICE OVERRIDE — Apply this brand voice to all output, overriding any default tone guidance: "${brandVoice.trim()}"\n\n${prompt}`;
+  }
+  if (writingSamples.length > 0) {
+    const samplesText = writingSamples
+      .map((s, i) => `Sample ${i + 1}:\n${s.trim()}`)
+      .join('\n\n---\n\n');
+    prompt += `\n\nWRITING SAMPLES — The user has provided examples of their own writing. Study their voice, rhythm, vocabulary, sentence structure, and tone. Mimic these qualities in your output — do NOT copy the content, only the style:\n\n${samplesText}`;
+  }
+  if (settings?.outputLanguage && settings.outputLanguage !== 'English') {
+    prompt += `\n\nIMPORTANT: Write ALL output in ${settings.outputLanguage}. Do not use English.`;
+  }
+  if (settings?.contentLength === 'concise') {
+    prompt += "\n\nLength instruction: Keep the output shorter and more concise than usual. Cut anything that isn't essential.";
+  } else if (settings?.contentLength === 'detailed') {
+    prompt += '\n\nLength instruction: Write a longer, more detailed and expansive version than you normally would.';
+  }
+  prompt += '\n\nQUALITY RULE: Your output must have perfect spelling and grammar. Never invent or merge words. Every sentence must be grammatically complete — never start a sentence with a comma, conjunction fragment, or mid-thought. Proofread before outputting.';
+
+  try {
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openaiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: prompt },
+          { role: 'user', content },
+        ],
+        stream: true,
+      }),
+    });
+
+    if (!openaiRes.ok) {
+      const errText = await openaiRes.text();
+      return res.status(502).json({ error: `OpenAI error: ${errText}` });
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    openaiRes.body.pipe(res);
+  } catch (err) {
+    console.error('Generate error:', err.message);
+    res.status(500).json({ error: 'Generation failed' });
+  }
+});
+
 // ── Stripe init ───────────────────────────────────────────────────────────────
 async function initStripe() {
   try {

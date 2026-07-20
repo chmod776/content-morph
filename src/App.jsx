@@ -16,7 +16,6 @@ import { apiFetch } from './utils/apiFetch';
 const MAX_HISTORY = 50;
 
 export default function App() {
-  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
   const { settings } = useSettings();
   const { profile, profileLoading } = useProfile();
   const { user, logout, login } = useAuth();
@@ -208,62 +207,24 @@ export default function App() {
     );
   };
 
-  const buildSystemPrompt = (platformPrompt) => {
-    let prompt = platformPrompt;
-
-    // Voice profile from account (overrides localStorage brandVoice)
-    const brandVoice = profile?.brand_voice || settings.brandVoice || '';
-    const writingSamples = profile?.writing_samples || [];
-
-    if (brandVoice.trim()) {
-      prompt = `BRAND VOICE OVERRIDE — Apply this brand voice to all output, overriding any default tone guidance: "${brandVoice.trim()}"\n\n${prompt}`;
-    }
-
-    if (writingSamples.length > 0) {
-      const samplesText = writingSamples
-        .map((s, i) => `Sample ${i + 1}:\n${s.trim()}`)
-        .join('\n\n---\n\n');
-      prompt += `\n\nWRITING SAMPLES — The user has provided examples of their own writing. Study their voice, rhythm, vocabulary, sentence structure, and tone. Mimic these qualities in your output — do NOT copy the content, only the style:\n\n${samplesText}`;
-    }
-
-    if (settings.outputLanguage && settings.outputLanguage !== 'English') {
-      prompt += `\n\nIMPORTANT: Write ALL output in ${settings.outputLanguage}. Do not use English.`;
-    }
-
-    if (settings.contentLength === 'concise') {
-      prompt += '\n\nLength instruction: Keep the output shorter and more concise than usual. Cut anything that isn\'t essential.';
-    } else if (settings.contentLength === 'detailed') {
-      prompt += '\n\nLength instruction: Write a longer, more detailed and expansive version than you normally would.';
-    }
-
-    prompt += '\n\nQUALITY RULE: Your output must have perfect spelling and grammar. Never invent or merge words. Every sentence must be grammatically complete — never start a sentence with a comma, conjunction fragment, or mid-thought. Proofread before outputting.';
-
-    return prompt;
-  };
-
   const generateForPlatform = async (platformId, content) => {
     const platform = platforms[platformId];
     setLoadingStates(prev => ({ ...prev, [platformId]: true }));
     setErrors(prev => ({ ...prev, [platformId]: false }));
     setOutputs(prev => ({ ...prev, [platformId]: '' }));
 
-    const systemPrompt = buildSystemPrompt(platform.prompt);
-
     try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await apiFetch('/api/generate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content }
-          ],
-          stream: true
-        })
+          platformPrompt: platform.prompt,
+          content,
+          settings: {
+            outputLanguage: settings.outputLanguage,
+            contentLength: settings.contentLength,
+          },
+        }),
       });
 
       if (!response.ok) throw new Error(`API Error: ${response.status}`);
@@ -271,14 +232,16 @@ export default function App() {
       let fullText = '';
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
+      let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // keep any incomplete line for the next chunk
         for (const line of lines) {
-          if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+          if (line.startsWith('data: ') && line.trim() !== 'data: [DONE]') {
             let parsed = null;
             try { parsed = JSON.parse(line.trim().slice(6)); } catch { continue; }
             const text = parsed?.choices?.[0]?.delta?.content || '';
@@ -316,10 +279,6 @@ export default function App() {
   };
 
   const handleGenerate = () => {
-    if (!apiKey) {
-      alert('OpenAI API Key is missing! Please set VITE_OPENAI_API_KEY in your environment.');
-      return;
-    }
     const currentInput = input;
     const currentPlatforms = [...selectedPlatforms];
     const completedOutputs = {};
