@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Moon, Sun, Mic2, Globe, Layers, AlignLeft, Check, Upload, Trash2, BookOpen } from 'lucide-react';
+import { X, Moon, Sun, Mic2, Globe, Layers, AlignLeft, Check, Upload, Trash2, BookOpen, CreditCard, ExternalLink } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 import { useProfile } from '../context/ProfileContext';
 import { platforms } from '../platforms';
@@ -18,6 +18,8 @@ export default function SettingsPanel({ isOpen, onClose }) {
   const { profile, updateProfile } = useProfile();
   const t = useTranslation();
   const panelRef = useRef(null);
+
+  const [portalLoading, setPortalLoading] = useState(false);
 
   const [draftVoice, setDraftVoice] = useState('');
   const [draftSamples, setDraftSamples] = useState(['', '', '']);
@@ -106,6 +108,21 @@ export default function SettingsPanel({ isOpen, onClose }) {
       alert(err.message || 'Failed to extract text');
     } finally {
       setUploadingIdx(null);
+    }
+  };
+
+  const handleManageBilling = async () => {
+    setPortalLoading(true);
+    try {
+      const { apiFetch } = await import('../utils/apiFetch');
+      const r = await apiFetch('/api/stripe/portal', { method: 'POST' });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.message || 'Failed to open billing portal');
+      window.open(data.url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      alert(err.message || 'Could not open billing portal. Please try again.');
+    } finally {
+      setPortalLoading(false);
     }
   };
 
@@ -351,6 +368,25 @@ export default function SettingsPanel({ isOpen, onClose }) {
             </div>
           </section>
 
+          <div style={styles.divider} />
+
+          {/* ── Billing ── */}
+          <section style={styles.section}>
+            <div style={styles.sectionHeader}>
+              <CreditCard size={16} style={{ marginRight: '8px', color: 'var(--text-muted)' }} />
+              <h3 style={styles.sectionTitle}>Billing</h3>
+            </div>
+            <p style={styles.sectionDesc}>Manage your subscription, update payment details, or cancel from the Stripe billing portal.</p>
+            <button
+              style={styles.billingBtn}
+              onClick={handleManageBilling}
+              disabled={portalLoading}
+            >
+              <ExternalLink size={14} style={{ marginRight: '7px' }} />
+              {portalLoading ? 'Opening…' : 'Manage subscription'}
+            </button>
+          </section>
+
         </div>
       </div>
     </>
@@ -387,4 +423,5 @@ const styles = {
   optionChip: { padding: '6px 14px', borderRadius: '20px', border: '1px solid', cursor: 'pointer', fontSize: '0.88rem', fontFamily: 'var(--font-body)', transition: 'all 0.15s', backgroundColor: 'transparent' },
   lengthOption: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderRadius: '8px', border: '1px solid', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: '0.92rem', transition: 'all 0.15s', textAlign: 'left', gap: '16px', overflow: 'hidden' },
   platformChip: { padding: '8px 16px', borderRadius: '20px', border: '1px solid', cursor: 'pointer', fontSize: '0.88rem', fontFamily: 'var(--font-body)', fontWeight: '500', transition: 'all 0.15s' },
+  billingBtn: { display: 'inline-flex', alignItems: 'center', backgroundColor: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '8px', padding: '9px 18px', fontSize: '0.88rem', fontFamily: 'var(--font-body)', fontWeight: '500', cursor: 'pointer', transition: 'border-color 0.15s, color 0.15s' },
 };
