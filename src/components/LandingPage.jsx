@@ -14,7 +14,6 @@ export default function LandingPage({ onLogin }) {
       {/* NAV */}
       <nav style={s.nav}>
         <span style={s.navLogo}>Content Morph</span>
-        <button style={s.navSignIn} onClick={onLogin}>Sign in</button>
       </nav>
 
       {/* HERO */}
@@ -144,7 +143,7 @@ const s = {
   nav: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     padding: '20px 40px',
     borderBottom: '1px solid var(--border-color)',
     position: 'sticky',
@@ -154,21 +153,10 @@ const s = {
   },
   navLogo: {
     fontFamily: 'var(--font-heading)',
-    fontSize: '1.2rem',
+    fontSize: '1.6rem',
     fontWeight: '700',
     color: 'var(--text-main)',
     letterSpacing: '-0.02em',
-  },
-  navSignIn: {
-    background: 'none',
-    border: '1px solid var(--border-color)',
-    color: 'var(--text-muted)',
-    fontFamily: 'var(--font-body)',
-    fontSize: '0.88rem',
-    padding: '8px 18px',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    transition: 'border-color 0.2s, color 0.2s',
   },
 
   /* HERO */
