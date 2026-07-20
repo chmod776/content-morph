@@ -113,7 +113,8 @@ export default function YouTubePrepPanel({ isOpen, onClose }) {
   }
 
   // ── SSE streaming helper ──────────────────────────────────────────────────
-  async function streamGenerate(transcript, isVideoTranscript, segments) {
+  // sourceLabel: shown as the "input" preview in history (filename or "Notes")
+  async function streamGenerate(transcript, isVideoTranscript, segments, sourceLabel) {
     setProgress('generating');
     setRawStream('');
     setOutput(null);
@@ -158,7 +159,30 @@ export default function YouTubePrepPanel({ isOpen, onClose }) {
           }
         }
       }
-      setOutput(parseOutput(full));
+
+      const parsed = parseOutput(full);
+      setOutput(parsed);
+
+      // ── Save to history (generated text only — no transcript, no video) ──
+      try {
+        const historyOutput = [
+          parsed.title      && `TITLE:\n${parsed.title}`,
+          parsed.description && `DESCRIPTION:\n${parsed.description}`,
+          parsed.chapters   && `CHAPTERS:\n${parsed.chapters}`,
+        ].filter(Boolean).join('\n\n');
+
+        await apiFetch('/api/history', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            input: sourceLabel || 'YouTube Studio',
+            selectedPlatforms: ['youtube'],
+            outputs: { youtube: historyOutput },
+          }),
+        });
+      } catch {
+        // History save failing should never block the user from seeing output
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -200,7 +224,7 @@ export default function YouTubePrepPanel({ isOpen, onClose }) {
             setWarnModal(null);
             const d = pendingData.current;
             pendingData.current = null;
-            streamGenerate(d.transcript, true, d.segments);
+            streamGenerate(d.transcript, true, d.segments, file?.name || 'YouTube Studio');
           },
           onCancel: () => {
             setWarnModal(null);
@@ -211,7 +235,7 @@ export default function YouTubePrepPanel({ isOpen, onClose }) {
         return;
       }
 
-      await streamGenerate(data.transcript, true, data.segments);
+      await streamGenerate(data.transcript, true, data.segments, file?.name || 'YouTube Studio');
     } catch (err) {
       setError(err.message);
       setProgress(null);
@@ -221,7 +245,8 @@ export default function YouTubePrepPanel({ isOpen, onClose }) {
   // ── Notes flow ────────────────────────────────────────────────────────────
   async function handleNotesGenerate() {
     if (!notes.trim()) return;
-    await streamGenerate(notes.trim(), false, []);
+    const label = notes.trim().slice(0, 80) + (notes.trim().length > 80 ? '…' : '');
+    await streamGenerate(notes.trim(), false, [], label);
   }
 
   // ── Copy helpers ──────────────────────────────────────────────────────────
