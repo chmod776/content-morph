@@ -19,7 +19,7 @@ export default function App() {
   const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
   const { settings } = useSettings();
   const { profile, profileLoading } = useProfile();
-  const { user, logout } = useAuth();
+  const { user, logout, login } = useAuth();
   const settingsRef = useRef(null);
 
   const [input, setInput]                       = useState('');
@@ -41,6 +41,29 @@ export default function App() {
   const [showPastDueBanner, setShowPastDueBanner] = useState(false);
   const [showPaymentFailedBanner, setShowPaymentFailedBanner] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [showSessionExpiredModal, setShowSessionExpiredModal] = useState(false);
+
+  // Restore any draft the user had when their session expired
+  useEffect(() => {
+    const saved = sessionStorage.getItem('cm_draft_input');
+    if (saved) {
+      setInput(saved);
+      sessionStorage.removeItem('cm_draft_input');
+    }
+  }, []);
+
+  // Listen for 401s from apiFetch — stash the draft and show re-auth modal
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      setInput(prev => {
+        if (prev.trim()) sessionStorage.setItem('cm_draft_input', prev);
+        return prev;
+      });
+      setShowSessionExpiredModal(true);
+    };
+    window.addEventListener('sessionExpired', handleSessionExpired);
+    return () => window.removeEventListener('sessionExpired', handleSessionExpired);
+  }, []);
 
   // Detect ?checkout=success or ?checkout=cancel param on return from Stripe
   const checkoutParam = new URLSearchParams(window.location.search).get('checkout');
@@ -439,6 +462,26 @@ export default function App() {
         />
       )}
 
+      {showSessionExpiredModal && (
+        <div style={styles.sessionExpiredOverlay}>
+          <div style={styles.sessionExpiredModal}>
+            <h2 style={styles.sessionExpiredTitle}>Session expired</h2>
+            <p style={styles.sessionExpiredBody}>
+              Your sign-in session has expired.{' '}
+              {sessionStorage.getItem('cm_draft_input')
+                ? 'Your draft has been saved — it will be restored after you sign in again.'
+                : 'Sign in again to continue.'}
+            </p>
+            <button
+              style={styles.sessionExpiredBtn}
+              onClick={() => { setShowSessionExpiredModal(false); login(); }}
+            >
+              Sign in again
+            </button>
+          </div>
+        </div>
+      )}
+
       {showSkipAlert && (
         <div style={styles.skipAlert}>
           <div style={styles.skipAlertArrow} />
@@ -601,6 +644,53 @@ const styles = {
     opacity: 0.7,
     lineHeight: 1,
     flexShrink: 0,
+  },
+  sessionExpiredOverlay: {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 600,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '20px',
+  },
+  sessionExpiredModal: {
+    backgroundColor: 'var(--panel-bg)',
+    border: '1px solid var(--border-color)',
+    borderRadius: '14px',
+    padding: '32px 28px',
+    maxWidth: '400px',
+    width: '100%',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+    textAlign: 'center',
+    animation: 'fadeSlideIn 0.2s ease-out',
+  },
+  sessionExpiredTitle: {
+    margin: '0 0 12px',
+    fontSize: '1.15rem',
+    fontFamily: 'var(--font-heading)',
+    color: 'var(--text-main)',
+    fontWeight: '700',
+  },
+  sessionExpiredBody: {
+    margin: '0 0 24px',
+    fontSize: '0.9rem',
+    color: 'var(--text-muted)',
+    fontFamily: 'var(--font-body)',
+    lineHeight: 1.55,
+  },
+  sessionExpiredBtn: {
+    width: '100%',
+    padding: '11px 0',
+    backgroundColor: 'var(--text-main)',
+    color: 'var(--bg-color)',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '0.95rem',
+    fontFamily: 'var(--font-body)',
+    fontWeight: '600',
+    cursor: 'pointer',
   },
   pastDueBanner: {
     position: 'fixed',
