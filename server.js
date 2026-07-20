@@ -79,7 +79,22 @@ const isAuthenticated = async (req, res, next) => {
     const supabase = getSupabaseAdmin();
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (error || !user) return res.status(401).json({ message: 'Unauthorized' });
-    req.user = user; // user.id is the Supabase UUID
+
+    // If Supabase has issued a different UUID for a returning user (e.g. after
+    // re-auth), look up the canonical ID we already have in the DB by email.
+    // This keeps all FK references (stripe_customer_id, profiles, history) intact
+    // without needing to migrate PKs.
+    if (user.email) {
+      const { rows } = await pool.query(
+        'SELECT id FROM users WHERE email = $1',
+        [user.email]
+      );
+      if (rows.length > 0 && rows[0].id !== user.id) {
+        user.id = rows[0].id; // use the stable DB id for all downstream queries
+      }
+    }
+
+    req.user = user;
     next();
   } catch (err) {
     console.error('Auth error:', err.message);
@@ -110,8 +125,9 @@ app.use(express.json());
 
 // ── POST /api/auth/sync ───────────────────────────────────────────────────────
 app.post('/api/auth/sync', isAuthenticated, async (req, res) => {
-  const client = await pool.connect();
   try {
+    // By the time we reach here, isAuthenticated has already resolved req.user.id
+    // to the canonical DB id (by email lookup), so a simple upsert-by-id is safe.
     const { id, email, user_metadata } = req.user;
     const fullName  = user_metadata?.full_name || user_metadata?.name || '';
     const parts     = fullName.trim().split(' ');
@@ -119,57 +135,24 @@ app.post('/api/auth/sync', isAuthenticated, async (req, res) => {
     const lastName  = parts.slice(1).join(' ') || '';
     const avatarUrl = user_metadata?.avatar_url || user_metadata?.picture || '';
 
-    await client.query('BEGIN');
-
-    // Check for an existing user with this email but a different auth ID.
-    // This happens when Supabase issues a new UID for the same Google account
-    // (e.g. after re-auth or provider change). We migrate FKs to the new ID
-    // so stripe_customer_id, profiles, and history are preserved.
-    const existing = await client.query(
-      'SELECT id FROM users WHERE email=$1',
-      [email]
+    await pool.query(
+      `INSERT INTO users (id, email, first_name, last_name, profile_image_url)
+       VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (id) DO UPDATE SET
+         email=$2, first_name=$3, last_name=$4,
+         profile_image_url=$5, updated_at=NOW()`,
+      [id, email, firstName, lastName, avatarUrl]
     );
-    const oldId = existing.rows[0]?.id;
-
-    if (oldId && oldId !== id) {
-      // Re-point all FK children to the incoming auth ID
-      await client.query('UPDATE profiles SET user_id=$1 WHERE user_id=$2', [id, oldId]);
-      await client.query('UPDATE history  SET user_id=$1 WHERE user_id=$2', [id, oldId]);
-      // Update the user row itself (PK change); preserve Stripe IDs
-      await client.query(
-        `UPDATE users SET id=$1, first_name=$2, last_name=$3,
-           profile_image_url=$4, updated_at=NOW()
-         WHERE id=$5`,
-        [id, firstName, lastName, avatarUrl, oldId]
-      );
-    } else {
-      // Normal upsert: insert new user or refresh name/avatar on existing
-      await client.query(
-        `INSERT INTO users (id, email, first_name, last_name, profile_image_url)
-         VALUES ($1,$2,$3,$4,$5)
-         ON CONFLICT (id) DO UPDATE SET
-           email=$2, first_name=$3, last_name=$4,
-           profile_image_url=$5, updated_at=NOW()`,
-        [id, email, firstName, lastName, avatarUrl]
-      );
-    }
-
-    // Ensure a profile row exists for this user
-    await client.query(
+    await pool.query(
       'INSERT INTO profiles (user_id) VALUES ($1) ON CONFLICT DO NOTHING',
       [id]
     );
 
-    await client.query('COMMIT');
-
-    const { rows } = await client.query('SELECT * FROM users WHERE id=$1', [id]);
+    const { rows } = await pool.query('SELECT * FROM users WHERE id=$1', [id]);
     res.json(rows[0]);
   } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
     console.error('Sync error:', err);
     res.status(500).json({ message: 'Server error' });
-  } finally {
-    client.release();
   }
 });
 
