@@ -53,142 +53,38 @@ async function initDb() {
   `);
 }
 
-// ── OIDC config (memoised, re-fetched every hour) ────────────────────────────
-const getOidcConfig = memoize(
-  () => client.discovery(
-    new URL(process.env.ISSUER_URL ?? 'https://replit.com/oidc'),
-    process.env.REPL_ID
-  ),
-  { maxAge: 3600 * 1000, promise: true }
-);
-
-function updateUserSession(user, tokens) {
-  user.claims       = tokens.claims();
-  user.access_token = tokens.access_token;
-  user.refresh_token = tokens.refresh_token;
-  user.expires_at   = user.claims?.exp;
-}
-
-async function upsertUser(claims) {
-  await pool.query(
-    `INSERT INTO users (id, email, first_name, last_name, profile_image_url)
-     VALUES ($1,$2,$3,$4,$5)
-     ON CONFLICT (id) DO UPDATE SET
-       email=$2, first_name=$3, last_name=$4, profile_image_url=$5, updated_at=NOW()`,
-    [claims.sub, claims.email, claims.first_name, claims.last_name, claims.profile_image_url]
-  );
-  // Ensure a profile row exists
-  await pool.query(
-    `INSERT INTO profiles (user_id) VALUES ($1) ON CONFLICT DO NOTHING`,
-    [claims.sub]
-  );
-}
-
-// ── Session ───────────────────────────────────────────────────────────────────
-const PgSession = connectPg(session);
-app.set('trust proxy', 1);
-app.use(session({
-  store: new PgSession({
-    pool,
-    tableName: 'sessions',
-    createTableIfMissing: false,
-  }),
-  secret: process.env.SESSION_SECRET,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    httpOnly: true,
-    secure: true,
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-    sameSite: 'none',
-  },
-}));
-
-app.use(passport.initialize());
-app.use(passport.session());
-passport.serializeUser((user, cb) => cb(null, user));
-passport.deserializeUser((user, cb) => cb(null, user));
-
-// ── Auth Routes ───────────────────────────────────────────────────────────────
-// Use the Replit-provided public domain; fall back to x-forwarded-host then req.hostname.
-function getPublicHostname(req) {
-  return process.env.REPLIT_DEV_DOMAIN
-    || req.get('x-forwarded-host')
-    || req.hostname;
-}
-
-const STRATEGY_NAME = 'replitauth';
-let strategyReady = false;
-
-async function ensureStrategy(hostname) {
-  if (strategyReady) return;
-  const config = await getOidcConfig();
-  const strategy = new Strategy(
-    {
-      name: STRATEGY_NAME,
-      config,
-      scope: 'openid email profile offline_access',
-      callbackURL: `https://${hostname}/api/callback`,
-    },
-    async (tokens, verified) => {
-      const user = {};
-      updateUserSession(user, tokens);
-      await upsertUser(tokens.claims());
-      verified(null, user);
-    }
-  );
-  passport.use(strategy);
-  strategyReady = true;
-}
-
-app.get('/api/login', async (req, res, next) => {
-  const hostname = getPublicHostname(req);
-  await ensureStrategy(hostname);
-  passport.authenticate(STRATEGY_NAME, {
-    prompt: 'login consent',
-    scope: ['openid', 'email', 'profile', 'offline_access'],
-  })(req, res, next);
-});
-
-app.get('/api/callback', async (req, res, next) => {
-  const hostname = getPublicHostname(req);
-  await ensureStrategy(hostname);
-  passport.authenticate(STRATEGY_NAME, {
-    successRedirect: '/',
-    failureRedirect: '/api/login',
-  })(req, res, next);
-});
-
-app.get('/api/logout', async (req, res) => {
-  const config = await getOidcConfig();
-  req.logout(() => {
-    const endUrl = client.buildEndSessionUrl(config, {
-      client_id: process.env.REPL_ID,
-      post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
-    }).href;
-    res.redirect(endUrl);
+// ── Supabase admin client (server-side only, uses service role key) ───────────
+function getSupabaseAdmin() {
+  const url        = process.env.SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
+  return createClient(url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
   });
-});
+}
 
-// ── Auth middleware ───────────────────────────────────────────────────────────
+// ── Auth middleware — verifies Supabase JWT ───────────────────────────────────
 const isAuthenticated = async (req, res, next) => {
-  const user = req.user;
-  if (!req.isAuthenticated() || !user?.expires_at) {
+  const authHeader = req.headers['authorization'];
+  if (!authHeader?.startsWith('Bearer ')) {
     return res.status(401).json({ message: 'Unauthorized' });
   }
-  const now = Math.floor(Date.now() / 1000);
-  if (now <= user.expires_at) return next();
-
-  if (!user.refresh_token) return res.status(401).json({ message: 'Unauthorized' });
+  const token = authHeader.slice(7);
   try {
-    const config = await getOidcConfig();
-    const tokenResponse = await client.refreshTokenGrant(config, user.refresh_token);
-    updateUserSession(user, tokenResponse);
-    return next();
-  } catch {
+    const supabase = getSupabaseAdmin();
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) return res.status(401).json({ message: 'Unauthorized' });
+    req.user = user; // user.id is the Supabase UUID
+    next();
+  } catch (err) {
+    console.error('Auth error:', err.message);
     return res.status(401).json({ message: 'Unauthorized' });
   }
 };
+
+// ── POST /api/auth/sync ───────────────────────────────────────────────────────
+// Called by the frontend after every sign-in to upsert the user row.
+
 
 // ── Stripe webhook (MUST be before express.json) ─────────────────────────────
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -207,13 +103,32 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 // ── JSON body parser ──────────────────────────────────────────────────────────
 app.use(express.json());
 
-// ── GET /api/auth/user ────────────────────────────────────────────────────────
-app.get('/api/auth/user', isAuthenticated, async (req, res) => {
+// ── POST /api/auth/sync ───────────────────────────────────────────────────────
+app.post('/api/auth/sync', isAuthenticated, async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT * FROM users WHERE id=$1', [req.user.claims.sub]);
-    res.json(rows[0] || null);
+    const { id, email, user_metadata } = req.user;
+    const fullName  = user_metadata?.full_name || user_metadata?.name || '';
+    const parts     = fullName.trim().split(' ');
+    const firstName = parts[0] || '';
+    const lastName  = parts.slice(1).join(' ') || '';
+    const avatarUrl = user_metadata?.avatar_url || user_metadata?.picture || '';
+
+    await pool.query(
+      `INSERT INTO users (id, email, first_name, last_name, profile_image_url)
+       VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (id) DO UPDATE SET
+         email=$2, first_name=$3, last_name=$4, profile_image_url=$5, updated_at=NOW()`,
+      [id, email, firstName, lastName, avatarUrl]
+    );
+    await pool.query(
+      'INSERT INTO profiles (user_id) VALUES ($1) ON CONFLICT DO NOTHING',
+      [id]
+    );
+
+    const { rows } = await pool.query('SELECT * FROM users WHERE id=$1', [id]);
+    res.json(rows[0]);
   } catch (err) {
-    console.error(err);
+    console.error('Sync error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -221,7 +136,7 @@ app.get('/api/auth/user', isAuthenticated, async (req, res) => {
 // ── GET /api/profile ──────────────────────────────────────────────────────────
 app.get('/api/profile', isAuthenticated, async (req, res) => {
   try {
-    const userId = req.user.claims.sub;
+    const userId = req.user.id;
     const { rows } = await pool.query('SELECT * FROM profiles WHERE user_id=$1', [userId]);
     if (rows.length === 0) {
       // Create default profile if missing
@@ -243,7 +158,7 @@ app.get('/api/profile', isAuthenticated, async (req, res) => {
 // ── PUT /api/profile ──────────────────────────────────────────────────────────
 app.put('/api/profile', isAuthenticated, async (req, res) => {
   try {
-    const userId = req.user.claims.sub;
+    const userId = req.user.id;
     const { brand_voice, writing_samples, onboarded } = req.body;
 
     const updates = {};
@@ -285,7 +200,7 @@ app.get('/api/history', isAuthenticated, async (req, res) => {
   try {
     const { rows } = await pool.query(
       'SELECT * FROM history WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50',
-      [req.user.claims.sub]
+      [req.user.id]
     );
     res.json(rows.map(r => ({
       id: r.id,
@@ -310,7 +225,7 @@ app.post('/api/history', isAuthenticated, async (req, res) => {
     const { rows } = await pool.query(
       `INSERT INTO history (user_id, input, selected_platforms, outputs)
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      [req.user.claims.sub, input, JSON.stringify(selectedPlatforms), JSON.stringify(outputs)]
+      [req.user.id, input, JSON.stringify(selectedPlatforms), JSON.stringify(outputs)]
     );
     const r = rows[0];
     res.json({ id: r.id, input: r.input, selectedPlatforms: r.selected_platforms, outputs: r.outputs, createdAt: r.created_at });
@@ -325,7 +240,7 @@ app.delete('/api/history/:id', isAuthenticated, async (req, res) => {
   try {
     await pool.query(
       'DELETE FROM history WHERE id=$1 AND user_id=$2',
-      [req.params.id, req.user.claims.sub]
+      [req.params.id, req.user.id]
     );
     res.json({ ok: true });
   } catch (err) {
@@ -337,7 +252,7 @@ app.delete('/api/history/:id', isAuthenticated, async (req, res) => {
 // ── DELETE /api/history ───────────────────────────────────────────────────────
 app.delete('/api/history', isAuthenticated, async (req, res) => {
   try {
-    await pool.query('DELETE FROM history WHERE user_id=$1', [req.user.claims.sub]);
+    await pool.query('DELETE FROM history WHERE user_id=$1', [req.user.id]);
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
@@ -348,7 +263,7 @@ app.delete('/api/history', isAuthenticated, async (req, res) => {
 // ── GET /api/stripe/subscription ─────────────────────────────────────────────
 app.get('/api/stripe/subscription', isAuthenticated, async (req, res) => {
   try {
-    const userId = req.user.claims.sub;
+    const userId = req.user.id;
     const { rows } = await pool.query('SELECT stripe_customer_id FROM users WHERE id=$1', [userId]);
     const customerId = rows[0]?.stripe_customer_id;
     if (!customerId) return res.json({ active: false });
@@ -370,7 +285,7 @@ app.get('/api/stripe/subscription', isAuthenticated, async (req, res) => {
 // ── POST /api/stripe/checkout ─────────────────────────────────────────────────
 app.post('/api/stripe/checkout', isAuthenticated, async (req, res) => {
   try {
-    const userId = req.user.claims.sub;
+    const userId = req.user.id;
     const { interval } = req.body;
     const stripe = await getUncachableStripeClient();
 
@@ -408,7 +323,7 @@ app.post('/api/stripe/checkout', isAuthenticated, async (req, res) => {
 // ── POST /api/stripe/portal ───────────────────────────────────────────────────
 app.post('/api/stripe/portal', isAuthenticated, async (req, res) => {
   try {
-    const userId = req.user.claims.sub;
+    const userId = req.user.id;
     const { rows } = await pool.query('SELECT stripe_customer_id FROM users WHERE id=$1', [userId]);
     const customerId = rows[0]?.stripe_customer_id;
     if (!customerId) return res.status(400).json({ message: 'No billing account found' });

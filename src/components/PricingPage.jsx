@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { apiFetch } from '../utils/apiFetch';
 
 export default function PricingPage({ user, onLogout }) {
   const [loading, setLoading] = useState(false);
@@ -8,9 +9,8 @@ export default function PricingPage({ user, onLogout }) {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/stripe/checkout', {
+      const res = await apiFetch('/api/stripe/checkout', {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ interval: 'month' }),
       });

@@ -1,10 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl     = import.meta.env.SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.SUPABASE_ANON_KEY;
+// Vite exposes VITE_* env vars to the browser automatically.
+// Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your Replit secrets.
+const supabaseUrl     = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing SUPABASE_URL or SUPABASE_ANON_KEY env vars');
+  throw new Error(
+    'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. ' +
+    'Add them as Replit secrets (same values as SUPABASE_URL / SUPABASE_ANON_KEY).'
+  );
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);

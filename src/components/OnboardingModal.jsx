@@ -57,9 +57,9 @@ export default function OnboardingModal({ onComplete, onSkip }) {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const r = await fetch('/api/profile/extract-text', {
+      const { apiFetch } = await import('../utils/apiFetch');
+      const r = await apiFetch('/api/profile/extract-text', {
         method: 'POST',
-        credentials: 'include',
         body: formData,
       });
       const data = await r.json();

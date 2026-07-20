@@ -19,7 +19,7 @@ export default function App() {
   const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
   const { settings } = useSettings();
   const { profile, profileLoading } = useProfile();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const settingsRef = useRef(null);
 
   const [input, setInput]                       = useState('');
@@ -183,9 +183,8 @@ export default function App() {
   };
 
   const addToHistory = (inputText, platforms, completedOutputs) => {
-    fetch('/api/history', {
+    apiFetch('/api/history', {
       method: 'POST',
-      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ input: inputText, selectedPlatforms: platforms, outputs: completedOutputs }),
     })
@@ -226,12 +225,12 @@ export default function App() {
 
   const handleHistoryDelete = (id) => {
     setHistory(prev => prev.filter(e => e.id !== id));
-    fetch(`/api/history/${id}`, { method: 'DELETE', credentials: 'include' }).catch(() => {});
+    apiFetch(`/api/history/${id}`, { method: 'DELETE' }).catch(() => {});
   };
 
   const handleHistoryClear = () => {
     setHistory([]);
-    fetch('/api/history', { method: 'DELETE', credentials: 'include' }).catch(() => {});
+    apiFetch('/api/history', { method: 'DELETE' }).catch(() => {});
   };
 
   const isGenerating = Object.values(loadingStates).some(state => state);
@@ -241,7 +240,7 @@ export default function App() {
     return (
       <PricingPage
         user={user}
-        onLogout={() => window.location.href = '/api/logout'}
+        onLogout={logout}
       />
     );
   }
