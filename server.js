@@ -273,15 +273,39 @@ app.get('/api/stripe/subscription', isAuthenticated, async (req, res) => {
     const customerId = rows[0]?.stripe_customer_id;
     if (!customerId) return res.json({ active: false, status: null });
 
+    // Primary: query local synced table (fast)
     const result = await pool.query(`
       SELECT status, current_period_end FROM stripe.subscriptions
       WHERE customer = $1
       ORDER BY created DESC LIMIT 1
     `, [customerId]);
 
-    const row = result.rows[0];
-    const status = row?.status;
-    const periodEnd = row?.current_period_end ?? null;
+    let status = result.rows[0]?.status ?? null;
+    let periodEnd = result.rows[0]?.current_period_end ?? null;
+
+    // Fallback: if local table has nothing active, ask Stripe directly.
+    // This handles webhook lag and dev-domain changes between sessions.
+    const isActive = status === 'active' || status === 'trialing';
+    if (!isActive) {
+      try {
+        const stripe = await getUncachableStripeClient();
+        const { data } = await stripe.subscriptions.list({
+          customer: customerId,
+          limit: 1,
+          status: 'all',
+          expand: [],
+        });
+        if (data.length > 0) {
+          const live = data[0];
+          status = live.status;
+          periodEnd = live.current_period_end ?? null;
+        }
+      } catch (stripeErr) {
+        console.warn('Stripe API fallback failed:', stripeErr.message);
+        // Continue with whatever the DB had
+      }
+    }
+
     res.json({
       active: status === 'active' || status === 'trialing',
       status: status || null,
