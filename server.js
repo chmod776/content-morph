@@ -269,13 +269,19 @@ app.get('/api/stripe/subscription', isAuthenticated, async (req, res) => {
     if (!customerId) return res.json({ active: false, status: null });
 
     const result = await pool.query(`
-      SELECT status FROM stripe.subscriptions
+      SELECT status, current_period_end FROM stripe.subscriptions
       WHERE customer = $1
       ORDER BY created DESC LIMIT 1
     `, [customerId]);
 
-    const status = result.rows[0]?.status;
-    res.json({ active: status === 'active' || status === 'trialing', status: status || null });
+    const row = result.rows[0];
+    const status = row?.status;
+    const periodEnd = row?.current_period_end ?? null;
+    res.json({
+      active: status === 'active' || status === 'trialing',
+      status: status || null,
+      currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+    });
   } catch (err) {
     console.error('Subscription check error:', err.message);
     res.json({ active: false, status: null });

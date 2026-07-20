@@ -138,6 +138,19 @@ export default function SettingsPanel({ isOpen, onClose, subscription }) {
     { value: 'detailed', label: t.detailedLabel, desc: t.detailedDesc },
   ];
 
+  const subDateLine = (() => {
+    const end = subscription?.currentPeriodEnd;
+    const status = subscription?.status;
+    if (!end || !status) return null;
+    const date = new Date(end);
+    const formatted = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const isFuture = date > new Date();
+    if (status === 'active' || status === 'trialing') return `Renews on ${formatted}`;
+    if (status === 'past_due') return `Access expires on ${formatted}`;
+    if ((status === 'canceled' || status === 'paused') && isFuture) return `Access until ${formatted}`;
+    return null;
+  })();
+
   const subBadge = (() => {
     const s = subscription?.status;
     if (!s) return null;
@@ -397,6 +410,9 @@ export default function SettingsPanel({ isOpen, onClose, subscription }) {
                 </span>
               )}
             </div>
+            {subDateLine && (
+              <p style={styles.subDateLine}>{subDateLine}</p>
+            )}
             {subscription?.status !== null && subscription?.status !== undefined ? (
               <>
                 <p style={styles.sectionDesc}>Manage your subscription, update payment details, or cancel from the Stripe billing portal.</p>
@@ -452,4 +468,5 @@ const styles = {
   platformChip: { padding: '8px 16px', borderRadius: '20px', border: '1px solid', cursor: 'pointer', fontSize: '0.88rem', fontFamily: 'var(--font-body)', fontWeight: '500', transition: 'all 0.15s' },
   billingBtn: { display: 'inline-flex', alignItems: 'center', backgroundColor: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '8px', padding: '9px 18px', fontSize: '0.88rem', fontFamily: 'var(--font-body)', fontWeight: '500', cursor: 'pointer', transition: 'border-color 0.15s, color 0.15s' },
   subBadge: { marginLeft: '10px', display: 'inline-block', padding: '2px 9px', borderRadius: '20px', border: '1px solid', fontSize: '0.73rem', fontFamily: 'var(--font-body)', fontWeight: '600', letterSpacing: '0.01em' },
+  subDateLine: { margin: '4px 0 12px', fontSize: '0.82rem', color: 'var(--text-muted)', fontFamily: 'var(--font-body)' },
 };
