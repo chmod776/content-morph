@@ -96,32 +96,11 @@ export default function LandingPage({ onLogin }) {
           <span style={s.heroAccent}>platform-ready posts</span>
         </h1>
         <div style={{ ...heroItem(240), display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={s.heroPricingCard}>
-            <div style={s.heroPricingAmount}>
-              <span style={s.heroPricingDollar}>$20.91</span>
-              <span style={s.heroPricingPer}> / month</span>
-            </div>
-            <ul style={s.heroPricingList}>
-              {[
-                'Unlimited content generations',
-                'All platforms: LinkedIn, X, Instagram & YouTube',
-                'Brand voice & writing samples',
-                'Full generation history',
-                'Live streaming output',
-                'Cancel anytime from your account',
-              ].map(item => (
-                <li key={item} style={s.heroPricingItem}>
-                  <span style={s.heroPricingCheck}>✓</span>
-                  {item}
-                </li>
-              ))}
-            </ul>
-            <button style={s.heroCta} onClick={onLogin}>
-              <GoogleIcon />
-              Get started with Google
-            </button>
-            <p style={s.heroSubNote}>Secured by Stripe · Cancel anytime</p>
-          </div>
+          <button style={s.heroCta} onClick={onLogin}>
+            <GoogleIcon />
+            Get started with Google
+          </button>
+          <p style={s.heroSubNote}>$20.91 / month · Cancel anytime</p>
         </div>
       </section>
 
