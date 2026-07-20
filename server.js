@@ -266,7 +266,7 @@ app.get('/api/stripe/subscription', isAuthenticated, async (req, res) => {
     const userId = req.user.id;
     const { rows } = await pool.query('SELECT stripe_customer_id FROM users WHERE id=$1', [userId]);
     const customerId = rows[0]?.stripe_customer_id;
-    if (!customerId) return res.json({ active: false });
+    if (!customerId) return res.json({ active: false, status: null });
 
     const result = await pool.query(`
       SELECT status FROM stripe.subscriptions
@@ -278,7 +278,7 @@ app.get('/api/stripe/subscription', isAuthenticated, async (req, res) => {
     res.json({ active: status === 'active' || status === 'trialing', status: status || null });
   } catch (err) {
     console.error('Subscription check error:', err.message);
-    res.json({ active: false });
+    res.json({ active: false, status: null });
   }
 });
 

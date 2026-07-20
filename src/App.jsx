@@ -38,6 +38,8 @@ export default function App() {
   const [subscription, setSubscription]         = useState(null);
   const [subLoading, setSubLoading]             = useState(true);
   const [showCheckoutBanner, setShowCheckoutBanner] = useState(false);
+  const [showPaymentFailedBanner, setShowPaymentFailedBanner] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
 
   // Detect ?checkout=success or ?checkout=cancel param on return from Stripe
   const checkoutParam = new URLSearchParams(window.location.search).get('checkout');
@@ -60,18 +62,20 @@ export default function App() {
     const fetchSub = async (attemptsLeft = 1) => {
       try {
         const r = await apiFetch('/api/stripe/subscription');
-        const data = r.ok ? await r.json() : { active: false };
+        const data = r.ok ? await r.json() : { active: false, status: null };
         if (cancelled) return;
         if (!data.active && checkoutSuccessRef.current && attemptsLeft > 0) {
           // Stripe webhook may not have fired yet — retry up to 5 times
           setTimeout(() => fetchSub(attemptsLeft - 1), 1500);
         } else {
-          setSubscription(data);
+          // Normalize: always ensure status is explicitly present (null = never subscribed)
+          setSubscription({ status: null, ...data });
           setSubLoading(false);
         }
       } catch {
         if (!cancelled) {
-          setSubscription({ active: false });
+          // Fail closed: treat API/network errors as "never subscribed" (show paywall)
+          setSubscription({ active: false, status: null });
           setSubLoading(false);
         }
       }
@@ -90,6 +94,51 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [subscription]);
+
+  // Show payment-failed banner only for known Stripe lapsed/failed statuses
+  // This avoids triggering on unknown or error-fallback states
+  const LAPSED_STATUSES = new Set(['past_due', 'canceled', 'unpaid', 'incomplete_expired', 'paused']);
+  useEffect(() => {
+    if (subscription && !subscription.active && LAPSED_STATUSES.has(subscription.status)) {
+      setShowPaymentFailedBanner(true);
+    }
+  }, [subscription]);
+
+  const handleOpenPortal = async () => {
+    setPortalLoading(true);
+    try {
+      const res = await apiFetch('/api/stripe/portal', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Could not open billing portal');
+      window.location.href = data.url;
+    } catch {
+      setPortalLoading(false);
+    }
+  };
+
+  const handleResubscribe = async () => {
+    try {
+      const res = await apiFetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interval: 'month' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to create checkout session');
+      window.location.href = data.url;
+    } catch {
+      // silently fall through — user stays on the page
+    }
+  };
+
+  const paymentFailedMessage = () => {
+    const status = subscription?.status;
+    if (status === 'past_due') return 'Your last payment failed.';
+    if (status === 'canceled') return 'Your subscription has been canceled.';
+    if (status === 'unpaid') return 'Your subscription is unpaid.';
+    if (status === 'incomplete_expired') return 'Your subscription setup did not complete.';
+    return 'Your subscription is no longer active.';
+  };
 
   // Load history from the database on mount
   useEffect(() => {
@@ -279,8 +328,9 @@ export default function App() {
 
   const isGenerating = Object.values(loadingStates).some(state => state);
 
-  // Show paywall if subscription check is done and user isn't subscribed
-  if (!subLoading && subscription && !subscription.active) {
+  // Show paywall only for users who have never subscribed (status === null)
+  // Users with a lapsed/failed subscription (status is non-null but inactive) see the app + a banner
+  if (!subLoading && subscription && !subscription.active && subscription.status === null) {
     return (
       <PricingPage
         user={user}
@@ -296,6 +346,22 @@ export default function App() {
         <div style={styles.checkoutBanner}>
           <span style={styles.checkoutBannerText}>🎉 You're subscribed! Welcome to ContentMorph.</span>
           <button style={styles.checkoutBannerClose} onClick={() => setShowCheckoutBanner(false)} aria-label="Dismiss">✕</button>
+        </div>
+      )}
+      {showPaymentFailedBanner && (
+        <div style={styles.paymentFailedBanner}>
+          <span style={styles.paymentFailedIcon}>⚠️</span>
+          <span style={styles.paymentFailedText}>
+            {paymentFailedMessage()}{' '}
+            <button style={styles.paymentFailedLink} onClick={handleOpenPortal} disabled={portalLoading}>
+              {portalLoading ? 'Opening…' : 'Update your billing'}
+            </button>
+            {' '}or{' '}
+            <button style={styles.paymentFailedLink} onClick={handleResubscribe}>
+              resubscribe
+            </button>.
+          </span>
+          <button style={styles.paymentFailedClose} onClick={() => setShowPaymentFailedBanner(false)} aria-label="Dismiss">✕</button>
         </div>
       )}
       <main style={styles.main}>
@@ -464,6 +530,60 @@ const styles = {
     padding: '0 2px',
     opacity: 0.7,
     lineHeight: 1,
+  },
+  paymentFailedBanner: {
+    position: 'fixed',
+    top: '20px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    zIndex: 400,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    backgroundColor: '#3a1a1a',
+    border: '1px solid #7a2d2d',
+    borderRadius: '10px',
+    padding: '12px 18px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+    animation: 'fadeSlideIn 0.25s ease-out',
+    maxWidth: '90vw',
+  },
+  paymentFailedIcon: {
+    fontSize: '1rem',
+    flexShrink: 0,
+  },
+  paymentFailedText: {
+    fontSize: '0.9rem',
+    color: '#e8a0a0',
+    fontFamily: 'var(--font-body)',
+    lineHeight: 1.45,
+  },
+  paymentFailedLink: {
+    background: 'none',
+    border: 'none',
+    color: '#f0c0c0',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.9rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    padding: 0,
+    textDecoration: 'underline',
+  },
+  paymentFailedAnchor: {
+    color: '#f0c0c0',
+    fontWeight: '600',
+    textDecoration: 'underline',
+  },
+  paymentFailedClose: {
+    background: 'none',
+    border: 'none',
+    color: '#e8a0a0',
+    cursor: 'pointer',
+    fontSize: '0.85rem',
+    padding: '0 2px',
+    opacity: 0.7,
+    lineHeight: 1,
+    flexShrink: 0,
   },
   footer: {
     marginTop: '48px',
