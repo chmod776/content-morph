@@ -15,7 +15,6 @@ export default function SignInPage() {
           Continue with Google
         </button>
 
-        <p style={styles.hint}>No password needed — we use your Google account.</p>
       </div>
     </div>
   );
@@ -76,13 +75,5 @@ const styles = {
     fontWeight: '500',
     cursor: 'pointer',
     transition: 'background-color 0.2s, border-color 0.2s',
-  },
-  hint: {
-    margin: '16px 0 0',
-    fontSize: '0.8rem',
-    color: 'var(--text-muted)',
-    textAlign: 'center',
-    fontFamily: 'var(--font-body)',
-    opacity: 0.7,
   },
 };
