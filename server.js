@@ -1,15 +1,10 @@
 import express from 'express';
-import session from 'express-session';
-import passport from 'passport';
-import * as client from 'openid-client';
-import { Strategy } from 'openid-client/passport';
-import connectPg from 'connect-pg-simple';
+import { createClient } from '@supabase/supabase-js';
 import pg from 'pg';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import memoize from 'memoizee';
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync, getUncachableStripeClient } from './stripeClient.js';
 import { WebhookHandlers } from './webhookHandlers.js';
@@ -23,13 +18,6 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 
 async function initDb() {
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS sessions (
-      sid  TEXT PRIMARY KEY,
-      sess JSONB NOT NULL,
-      expire TIMESTAMP NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS IDX_session_expire ON sessions(expire);
-
     CREATE TABLE IF NOT EXISTS users (
       id                     TEXT PRIMARY KEY,
       email                  TEXT UNIQUE,

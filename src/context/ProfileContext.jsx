@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+import { apiFetch } from '../utils/apiFetch';
 
 const ProfileContext = createContext(null);
 
@@ -11,7 +12,7 @@ export function ProfileProvider({ children }) {
   const fetchProfile = useCallback(async () => {
     if (!isAuthenticated) { setProfileLoading(false); return; }
     try {
-      const r = await fetch('/api/profile', { credentials: 'include' });
+      const r = await apiFetch('/api/profile');
       if (!r.ok) throw new Error('Failed to fetch profile');
       setProfile(await r.json());
     } catch {
@@ -25,9 +26,8 @@ export function ProfileProvider({ children }) {
 
   const updateProfile = useCallback(async (updates) => {
     try {
-      const r = await fetch('/api/profile', {
+      const r = await apiFetch('/api/profile', {
         method: 'PUT',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       });

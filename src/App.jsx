@@ -11,6 +11,7 @@ import { platforms } from './platforms';
 import { useSettings } from './context/SettingsContext';
 import { useProfile } from './context/ProfileContext';
 import { useAuth } from './context/AuthContext';
+import { apiFetch } from './utils/apiFetch';
 
 const MAX_HISTORY = 50;
 
@@ -39,7 +40,7 @@ export default function App() {
 
   // Check subscription status on mount
   useEffect(() => {
-    fetch('/api/stripe/subscription', { credentials: 'include' })
+    apiFetch('/api/stripe/subscription')
       .then(r => r.ok ? r.json() : { active: false })
       .then(data => setSubscription(data))
       .catch(() => setSubscription({ active: false }))
@@ -48,7 +49,7 @@ export default function App() {
 
   // Load history from the database on mount
   useEffect(() => {
-    fetch('/api/history', { credentials: 'include' })
+    apiFetch('/api/history')
       .then(r => r.ok ? r.json() : [])
       .then(data => setHistory(Array.isArray(data) ? data : []))
       .catch(() => setHistory([]))
