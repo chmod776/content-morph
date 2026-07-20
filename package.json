@@ -12,6 +12,7 @@
     "start": "NODE_ENV=production node server.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.109.0",
     "@types/connect-pg-simple": "^7.0.3",
     "@types/express-session": "^1.19.0",
     "@types/memoizee": "^0.4.12",
