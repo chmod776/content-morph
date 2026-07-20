@@ -96,11 +96,32 @@ export default function LandingPage({ onLogin }) {
           <span style={s.heroAccent}>platform-ready posts</span>
         </h1>
         <div style={{ ...heroItem(240), display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <button style={s.heroCta} onClick={onLogin}>
-            <GoogleIcon />
-            Get started with Google
-          </button>
-          <p style={s.heroSubNote}>$20.91 / month · Cancel anytime</p>
+          <div style={s.heroPricingCard}>
+            <div style={s.heroPricingAmount}>
+              <span style={s.heroPricingDollar}>$20.91</span>
+              <span style={s.heroPricingPer}> / month</span>
+            </div>
+            <ul style={s.heroPricingList}>
+              {[
+                'Unlimited content generations',
+                'All platforms: LinkedIn, X, Instagram & YouTube',
+                'Brand voice & writing samples',
+                'Full generation history',
+                'Live streaming output',
+                'Cancel anytime from your account',
+              ].map(item => (
+                <li key={item} style={s.heroPricingItem}>
+                  <span style={s.heroPricingCheck}>✓</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <button style={s.heroCta} onClick={onLogin}>
+              <GoogleIcon />
+              Get started with Google
+            </button>
+            <p style={s.heroSubNote}>Secured by Stripe · Cancel anytime</p>
+          </div>
         </div>
       </section>
 
@@ -294,10 +315,58 @@ const s = {
     transition: 'opacity 0.2s',
   },
   heroSubNote: {
-    fontSize: '0.8rem',
+    fontSize: '0.76rem',
     color: 'var(--text-muted)',
     margin: 0,
     opacity: 0.6,
+    textAlign: 'center',
+  },
+
+  /* HERO PRICING CARD */
+  heroPricingCard: {
+    width: '100%',
+    maxWidth: '400px',
+    backgroundColor: 'var(--panel-bg)',
+    border: '1px solid var(--border-color)',
+    borderRadius: '20px',
+    padding: '36px 32px 28px',
+    textAlign: 'left',
+    marginTop: '8px',
+  },
+  heroPricingAmount: {
+    textAlign: 'center',
+    marginBottom: '28px',
+  },
+  heroPricingDollar: {
+    fontFamily: 'var(--font-heading)',
+    fontSize: '3rem',
+    fontWeight: '700',
+    color: 'var(--text-main)',
+  },
+  heroPricingPer: {
+    fontSize: '1rem',
+    color: 'var(--text-muted)',
+  },
+  heroPricingList: {
+    listStyle: 'none',
+    padding: 0,
+    margin: '0 0 28px',
+  },
+  heroPricingItem: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '10px',
+    fontSize: '0.88rem',
+    color: 'var(--text-muted)',
+    padding: '9px 0',
+    borderBottom: '1px solid var(--border-color)',
+    lineHeight: 1.5,
+  },
+  heroPricingCheck: {
+    color: 'var(--text-main)',
+    fontWeight: '700',
+    flexShrink: 0,
+    marginTop: '1px',
   },
 
   /* SECTIONS */
