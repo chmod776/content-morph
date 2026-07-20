@@ -1,26 +1,30 @@
 ---
-name: Post-payment subscription loop
-description: After Stripe checkout, user is sent back to PricingPage instead of the main app
+name: Post-payment subscription loop — RESOLVED
+description: Root cause and fix for users being sent back to PricingPage after successful Stripe checkout
 ---
 
-## Symptom
-After completing Stripe checkout and finishing onboarding, the user is redirected back to the pricing/subscribe page as if they have no subscription. The app only shows the main UI when `subscription.active === true`.
+## Root cause
+Supabase was issuing a different UUID for the same Google account across sessions. Every DB lookup (subscription, profile, history) used `req.user.id` from the JWT. When the UUID changed, lookups returned nothing and the app showed the paywall.
 
-## Likely causes
+Secondary symptom: `/api/auth/sync` was failing with `duplicate key on users_email_key` because it tried to INSERT a new user row with the new UUID but the same email — crashing before any data could be linked.
 
-1. **Webhook lag** — `stripe-replit-sync` processes the `checkout.session.completed` event to populate `stripe.subscriptions`. The app retries the subscription fetch up to 5 times with 1.5s delays on `?checkout=success`, but the webhook may not have fired yet if the Replit dev URL changed (webhook endpoint is tied to a specific URL).
+## Fix (in isAuthenticated middleware)
+After verifying the JWT, look up the canonical DB user ID by email. If the email already exists in `users` with a different ID, override `req.user.id` with the stable DB ID before any route handler runs:
 
-2. **Stale webhook endpoint** — The webhook URL registered in Stripe is tied to the Replit dev domain. If the domain changes between sessions, the webhook stops firing and subscriptions never get written to the DB. Server logs on startup show it cleaning up orphaned webhooks and registering a new one — confirm the new URL is correct in Stripe dashboard.
+```js
+if (user.email) {
+  const { rows } = await pool.query('SELECT id FROM users WHERE email = $1', [user.email]);
+  if (rows.length > 0 && rows[0].id !== user.id) {
+    user.id = rows[0].id;
+  }
+}
+```
 
-3. **Test mode** — User suspects it may be a test-mode-specific issue. Worth testing with Stripe test card `4242 4242 4242 4242` and checking `stripe.subscriptions` table directly after checkout.
+This keeps all FKs (stripe_customer_id, profiles, history) intact without any PK migration.
 
-## What to check next session
-- Query `stripe.subscriptions` in the DB after a test checkout to confirm the row is being written.
-- Check the Stripe dashboard webhook logs to see if the `checkout.session.completed` event was delivered successfully.
-- If the webhook isn't firing, the new webhook URL registered on startup may not be reachable (e.g. Replit dev domain changed).
-- The retry logic in `App.jsx` (`fetchSub` with up to 5 retries) may need a longer delay or more retries.
+**Why:** Changing PKs to match auth IDs is dangerous — FK constraints fire in the wrong order and require DEFERRABLE constraints or complex migration. Resolving at the middleware layer is safe, cheap, and transparent to all routes.
 
-## Relevant files
-- `App.jsx` — `fetchSub` function, subscription retry logic on `?checkout=success`
-- `server.js` — `initStripe()` registers the webhook; `stripe-replit-sync` handles events
-- `webhookHandlers.js` — delegates Stripe events to stripe-replit-sync
+**How to apply:** Any future auth change (new provider, Supabase user re-creation) is handled automatically by this lookup. No migration needed.
+
+## Also added: Stripe API fallback in subscription check
+`/api/stripe/subscription` now falls back to the live Stripe API when the local `stripe.subscriptions` table has nothing active for the customer. Handles webhook lag and stale webhook URLs after Replit dev domain changes.
