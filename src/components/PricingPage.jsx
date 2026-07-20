@@ -1,12 +1,8 @@
 import React, { useState } from 'react';
 
 export default function PricingPage({ user, onLogout }) {
-  const [billing, setBilling] = useState('monthly');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  const price = billing === 'monthly' ? '$9.99/month' : '$79.99/year';
-  const savings = billing === 'yearly' ? 'Save 33%' : null;
 
   const handleSubscribe = async () => {
     setLoading(true);
@@ -16,7 +12,7 @@ export default function PricingPage({ user, onLogout }) {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ interval: billing === 'monthly' ? 'month' : 'year' }),
+        body: JSON.stringify({ interval: 'month' }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to create checkout session');
@@ -33,22 +29,9 @@ export default function PricingPage({ user, onLogout }) {
         <h1 style={styles.logo}>Content Morph</h1>
         <p style={styles.tagline}>Transform your raw notes into platform-ready posts.</p>
 
-        <div style={styles.toggleRow}>
-          <button
-            style={{ ...styles.toggleBtn, ...(billing === 'monthly' ? styles.toggleActive : {}) }}
-            onClick={() => setBilling('monthly')}
-          >Monthly</button>
-          <button
-            style={{ ...styles.toggleBtn, ...(billing === 'yearly' ? styles.toggleActive : {}) }}
-            onClick={() => setBilling('yearly')}
-          >
-            Yearly
-            {savings && <span style={styles.savingsBadge}>{savings}</span>}
-          </button>
-        </div>
-
         <div style={styles.priceBox}>
-          <span style={styles.priceAmount}>{price}</span>
+          <span style={styles.priceAmount}>$20.91</span>
+          <span style={styles.pricePer}>/month</span>
         </div>
 
         <ul style={styles.featureList}>
@@ -112,52 +95,23 @@ const styles = {
     margin: '0 0 32px',
     lineHeight: '1.5',
   },
-  toggleRow: {
-    display: 'flex',
-    backgroundColor: 'var(--bg-color)',
-    borderRadius: '10px',
-    padding: '4px',
-    marginBottom: '28px',
-    gap: '4px',
-  },
-  toggleBtn: {
-    flex: 1,
-    padding: '8px 0',
-    border: 'none',
-    borderRadius: '7px',
-    background: 'transparent',
-    color: 'var(--text-muted)',
-    fontSize: '0.88rem',
-    fontFamily: 'var(--font-body)',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '6px',
-    transition: 'all 0.15s ease',
-  },
-  toggleActive: {
-    backgroundColor: 'var(--panel-bg)',
-    color: 'var(--text-main)',
-    fontWeight: '600',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
-  },
-  savingsBadge: {
-    fontSize: '0.7rem',
-    backgroundColor: 'var(--text-main)',
-    color: 'var(--bg-color)',
-    padding: '2px 6px',
-    borderRadius: '99px',
-    fontWeight: '700',
-  },
   priceBox: {
     marginBottom: '28px',
+    display: 'flex',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    gap: '4px',
   },
   priceAmount: {
-    fontSize: '2.2rem',
+    fontSize: '2.8rem',
     fontWeight: '700',
     color: 'var(--text-main)',
     fontFamily: 'var(--font-heading)',
+  },
+  pricePer: {
+    fontSize: '1rem',
+    color: 'var(--text-muted)',
+    fontWeight: '400',
   },
   featureList: {
     listStyle: 'none',
