@@ -38,13 +38,47 @@ export default function App() {
   const [subscription, setSubscription]         = useState(null);
   const [subLoading, setSubLoading]             = useState(true);
 
-  // Check subscription status on mount
+  // Detect ?checkout=success param on return from Stripe
+  const checkoutSuccessRef = useRef(
+    new URLSearchParams(window.location.search).get('checkout') === 'success'
+  );
+
+  // Clean the URL param without a page reload
   useEffect(() => {
-    apiFetch('/api/stripe/subscription')
-      .then(r => r.ok ? r.json() : { active: false })
-      .then(data => setSubscription(data))
-      .catch(() => setSubscription({ active: false }))
-      .finally(() => setSubLoading(false));
+    if (checkoutSuccessRef.current) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('checkout');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, []);
+
+  // Check subscription status on mount; retry on checkout success (webhook may lag)
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchSub = async (attemptsLeft = 1) => {
+      try {
+        const r = await apiFetch('/api/stripe/subscription');
+        const data = r.ok ? await r.json() : { active: false };
+        if (cancelled) return;
+        if (!data.active && checkoutSuccessRef.current && attemptsLeft > 0) {
+          // Stripe webhook may not have fired yet — retry up to 5 times
+          setTimeout(() => fetchSub(attemptsLeft - 1), 1500);
+        } else {
+          setSubscription(data);
+          setSubLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setSubscription({ active: false });
+          setSubLoading(false);
+        }
+      }
+    };
+
+    fetchSub(checkoutSuccessRef.current ? 5 : 0);
+
+    return () => { cancelled = true; };
   }, []);
 
   // Load history from the database on mount
