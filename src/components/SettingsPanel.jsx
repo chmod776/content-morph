@@ -13,7 +13,7 @@ const nativeLanguageNames = {
   Japanese: '日本語', Korean: '한국어', Mandarin: '中文',
 };
 
-export default function SettingsPanel({ isOpen, onClose }) {
+export default function SettingsPanel({ isOpen, onClose, subscription }) {
   const { settings, updateSetting } = useSettings();
   const { profile, updateProfile } = useProfile();
   const t = useTranslation();
@@ -376,15 +376,21 @@ export default function SettingsPanel({ isOpen, onClose }) {
               <CreditCard size={16} style={{ marginRight: '8px', color: 'var(--text-muted)' }} />
               <h3 style={styles.sectionTitle}>Billing</h3>
             </div>
-            <p style={styles.sectionDesc}>Manage your subscription, update payment details, or cancel from the Stripe billing portal.</p>
-            <button
-              style={styles.billingBtn}
-              onClick={handleManageBilling}
-              disabled={portalLoading}
-            >
-              <ExternalLink size={14} style={{ marginRight: '7px' }} />
-              {portalLoading ? 'Opening…' : 'Manage subscription'}
-            </button>
+            {subscription?.status !== null && subscription?.status !== undefined ? (
+              <>
+                <p style={styles.sectionDesc}>Manage your subscription, update payment details, or cancel from the Stripe billing portal.</p>
+                <button
+                  style={styles.billingBtn}
+                  onClick={handleManageBilling}
+                  disabled={portalLoading}
+                >
+                  <ExternalLink size={14} style={{ marginRight: '7px' }} />
+                  {portalLoading ? 'Opening…' : 'Manage subscription'}
+                </button>
+              </>
+            ) : (
+              <p style={styles.sectionDesc}>You don't have an active subscription yet. Subscribe from the main screen to unlock full access.</p>
+            )}
           </section>
 
         </div>
