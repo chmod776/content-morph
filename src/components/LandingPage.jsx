@@ -1,7 +1,79 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+
+/* ── Scroll-reveal hook ──────────────────────────────────────────────────────
+   Returns a ref and a boolean `visible`. Once the element enters the viewport
+   it stays visible (no re-hiding on scroll back). */
+function useReveal(threshold = 0.15) {
+  const ref  = useRef(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } },
+      { threshold }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [threshold]);
+  return [ref, visible];
+}
+
+/* ── Reveal wrapper ──────────────────────────────────────────────────────────
+   Wraps any child with a fade + slide-up reveal, triggered by useReveal.
+   `delay` is in ms for staggering siblings. */
+function Reveal({ children, delay = 0, style = {} }) {
+  const [ref, visible] = useReveal();
+  return (
+    <div
+      ref={ref}
+      style={{
+        opacity:    visible ? 1 : 0,
+        transform:  visible ? 'translateY(0)' : 'translateY(36px)',
+        transition: `opacity 0.7s ease ${delay}ms, transform 0.7s ease ${delay}ms`,
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/* ── RevealCard ──────────────────────────────────────────────────────────────
+   Like Reveal but merges the animation styles directly onto the card div so
+   grid layout isn't broken by an extra wrapper element. */
+function RevealCard({ children, delay = 0, cardStyle = {} }) {
+  const [ref, visible] = useReveal();
+  return (
+    <div
+      ref={ref}
+      style={{
+        ...cardStyle,
+        opacity:    visible ? 1 : 0,
+        transform:  visible ? 'translateY(0)' : 'translateY(36px)',
+        transition: `opacity 0.7s ease ${delay}ms, transform 0.7s ease ${delay}ms`,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
 
 export default function LandingPage({ onLogin }) {
   const [emailCopied, setEmailCopied] = useState(false);
+
+  // Hero elements animate in on mount, staggered
+  const [heroVisible, setHeroVisible] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setHeroVisible(true), 80);
+    return () => clearTimeout(t);
+  }, []);
+
+  const heroItem = (delay) => ({
+    opacity:    heroVisible ? 1 : 0,
+    transform:  heroVisible ? 'translateY(0)' : 'translateY(28px)',
+    transition: `opacity 0.75s ease ${delay}ms, transform 0.75s ease ${delay}ms`,
+  });
 
   const handleCopyEmail = () => {
     navigator.clipboard.writeText('contentmorph71@gmail.com');
@@ -18,43 +90,49 @@ export default function LandingPage({ onLogin }) {
 
       {/* HERO */}
       <section style={s.hero}>
-        <div style={s.heroBadge}>Content creation, simplified</div>
-        <h1 style={s.heroHeadline}>
+        <div style={{ ...s.heroBadge, ...heroItem(0) }}>Content creation, simplified</div>
+        <h1 style={{ ...s.heroHeadline, ...heroItem(120) }}>
           Turn rough notes into<br />
           <span style={s.heroAccent}>platform-ready posts</span>
         </h1>
-        <p style={s.heroSub}>
+        <p style={{ ...s.heroSub, ...heroItem(240) }}>
           Paste your ideas and get polished LinkedIn posts, tweets, Instagram captions,
           and more, all tailored to your brand voice. In seconds.
         </p>
-        <button style={s.heroCta} onClick={onLogin}>
-          <GoogleIcon />
-          Get started with Google
-        </button>
-        <p style={s.heroSubNote}>$20.91 / month · Cancel anytime</p>
+        <div style={{ ...heroItem(360), display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <button style={s.heroCta} onClick={onLogin}>
+            <GoogleIcon />
+            Get started with Google
+          </button>
+          <p style={s.heroSubNote}>$20.91 / month · Cancel anytime</p>
+        </div>
       </section>
 
       {/* HOW IT WORKS */}
       <section style={s.section}>
-        <h2 style={s.sectionTitle}>How it works</h2>
+        <Reveal>
+          <h2 style={s.sectionTitle}>How it works</h2>
+        </Reveal>
         <div style={s.steps}>
           {[
             { n: '1', title: 'Paste your notes', desc: 'Dump your raw ideas, bullet points, or a rough draft. No polish needed.' },
             { n: '2', title: 'Pick your platforms', desc: 'Select LinkedIn, X, Instagram, YouTube, or all of them at once.' },
             { n: '3', title: 'Get ready-to-post content', desc: 'Your notes are rewritten into platform-native copy, streamed live to your screen.' },
-          ].map(step => (
-            <div key={step.n} style={s.step}>
+          ].map((step, i) => (
+            <RevealCard key={step.n} delay={i * 120} cardStyle={s.step}>
               <div style={s.stepNum}>{step.n}</div>
               <h3 style={s.stepTitle}>{step.title}</h3>
               <p style={s.stepDesc}>{step.desc}</p>
-            </div>
+            </RevealCard>
           ))}
         </div>
       </section>
 
       {/* FEATURES */}
       <section style={s.section}>
-        <h2 style={s.sectionTitle}>Everything you need</h2>
+        <Reveal>
+          <h2 style={s.sectionTitle}>Everything you need</h2>
+        </Reveal>
         <div style={s.features}>
           {[
             { icon: '✦', title: 'Unlimited generations', desc: 'Run as many generations as you want. No caps, no credits.' },
@@ -63,46 +141,50 @@ export default function LandingPage({ onLogin }) {
             { icon: '✍️', title: 'Writing samples', desc: 'Upload examples of your writing and every post mirrors your style exactly.' },
             { icon: '📋', title: 'Generation history', desc: 'Every output is saved so you can revisit, tweak, or repost anything.' },
             { icon: '⚡', title: 'Live streaming output', desc: 'Watch your content appear word by word. No waiting for a wall of text.' },
-          ].map(f => (
-            <div key={f.title} style={s.featureCard}>
+          ].map((f, i) => (
+            <RevealCard key={f.title} delay={i * 80} cardStyle={s.featureCard}>
               <span style={s.featureIcon}>{f.icon}</span>
               <h3 style={s.featureTitle}>{f.title}</h3>
               <p style={s.featureDesc}>{f.desc}</p>
-            </div>
+            </RevealCard>
           ))}
         </div>
       </section>
 
       {/* PRICING */}
       <section style={{ ...s.section, ...s.pricingSection }}>
-        <h2 style={s.sectionTitle}>Simple pricing</h2>
-        <p style={s.pricingSubtitle}>One plan. Everything included. No surprises.</p>
-        <div style={s.pricingCard}>
-          <div style={s.pricingAmount}>
-            <span style={s.pricingDollar}>$20.91</span>
-            <span style={s.pricingPer}> / month</span>
+        <Reveal>
+          <h2 style={s.sectionTitle}>Simple pricing</h2>
+          <p style={s.pricingSubtitle}>One plan. Everything included. No surprises.</p>
+        </Reveal>
+        <Reveal delay={100}>
+          <div style={s.pricingCard}>
+            <div style={s.pricingAmount}>
+              <span style={s.pricingDollar}>$20.91</span>
+              <span style={s.pricingPer}> / month</span>
+            </div>
+            <ul style={s.pricingList}>
+              {[
+                'Unlimited content generations',
+                'All platforms: LinkedIn, X, Instagram & YouTube',
+                'Brand voice & writing samples',
+                'Full generation history',
+                'Live streaming output',
+                'Cancel anytime from your account',
+              ].map(item => (
+                <li key={item} style={s.pricingItem}>
+                  <span style={s.pricingCheck}>✓</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <button style={s.pricingCta} onClick={onLogin}>
+              <GoogleIcon />
+              Get started with Google
+            </button>
+            <p style={s.pricingSecure}>Secured by Stripe · No free trial needed to cancel</p>
           </div>
-          <ul style={s.pricingList}>
-            {[
-              'Unlimited content generations',
-              'All platforms: LinkedIn, X, Instagram & YouTube',
-              'Brand voice & writing samples',
-              'Full generation history',
-              'Live streaming output',
-              'Cancel anytime from your account',
-            ].map(item => (
-              <li key={item} style={s.pricingItem}>
-                <span style={s.pricingCheck}>✓</span>
-                {item}
-              </li>
-            ))}
-          </ul>
-          <button style={s.pricingCta} onClick={onLogin}>
-            <GoogleIcon />
-            Get started with Google
-          </button>
-          <p style={s.pricingSecure}>Secured by Stripe · No free trial needed to cancel</p>
-        </div>
+        </Reveal>
       </section>
 
       {/* FOOTER */}
