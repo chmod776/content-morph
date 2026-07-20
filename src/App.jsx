@@ -37,6 +37,7 @@ export default function App() {
   const [emailCopied, setEmailCopied]           = useState(false);
   const [subscription, setSubscription]         = useState(null);
   const [subLoading, setSubLoading]             = useState(true);
+  const [showCheckoutBanner, setShowCheckoutBanner] = useState(false);
 
   // Detect ?checkout=success or ?checkout=cancel param on return from Stripe
   const checkoutParam = new URLSearchParams(window.location.search).get('checkout');
@@ -80,6 +81,15 @@ export default function App() {
 
     return () => { cancelled = true; };
   }, []);
+
+  // Show checkout success banner once subscription is confirmed active
+  useEffect(() => {
+    if (checkoutSuccessRef.current && subscription && subscription.active) {
+      setShowCheckoutBanner(true);
+      const timer = setTimeout(() => setShowCheckoutBanner(false), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [subscription]);
 
   // Load history from the database on mount
   useEffect(() => {
@@ -282,6 +292,12 @@ export default function App() {
 
   return (
     <div style={styles.layout}>
+      {showCheckoutBanner && (
+        <div style={styles.checkoutBanner}>
+          <span style={styles.checkoutBannerText}>🎉 You're subscribed! Welcome to ContentMorph.</span>
+          <button style={styles.checkoutBannerClose} onClick={() => setShowCheckoutBanner(false)} aria-label="Dismiss">✕</button>
+        </div>
+      )}
       <main style={styles.main}>
         <InputPanel
           input={input}
@@ -415,6 +431,39 @@ const styles = {
     fontFamily: 'var(--font-body)',
     fontWeight: '600',
     cursor: 'pointer',
+  },
+  checkoutBanner: {
+    position: 'fixed',
+    top: '20px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    zIndex: 400,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    backgroundColor: '#1a3a1a',
+    border: '1px solid #2d6a2d',
+    borderRadius: '10px',
+    padding: '12px 18px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+    animation: 'fadeSlideIn 0.25s ease-out',
+    whiteSpace: 'nowrap',
+  },
+  checkoutBannerText: {
+    fontSize: '0.92rem',
+    color: '#7eca7e',
+    fontFamily: 'var(--font-body)',
+    fontWeight: '500',
+  },
+  checkoutBannerClose: {
+    background: 'none',
+    border: 'none',
+    color: '#7eca7e',
+    cursor: 'pointer',
+    fontSize: '0.85rem',
+    padding: '0 2px',
+    opacity: 0.7,
+    lineHeight: 1,
   },
   footer: {
     marginTop: '48px',
