@@ -218,7 +218,7 @@ const s = {
   },
   navLogo: {
     fontFamily: 'var(--font-heading)',
-    fontSize: '1.6rem',
+    fontSize: '2.2rem',
     fontWeight: '700',
     color: 'var(--text-main)',
     letterSpacing: '-0.02em',
