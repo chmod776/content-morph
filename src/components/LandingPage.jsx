@@ -95,11 +95,7 @@ export default function LandingPage({ onLogin }) {
           Turn rough notes into<br />
           <span style={s.heroAccent}>platform-ready posts</span>
         </h1>
-        <p style={{ ...s.heroSub, ...heroItem(240) }}>
-          Paste your ideas and get polished LinkedIn posts, tweets, Instagram captions,
-          and more, all tailored to your brand voice. In seconds.
-        </p>
-        <div style={{ ...heroItem(360), display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ ...heroItem(240), display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <button style={s.heroCta} onClick={onLogin}>
             <GoogleIcon />
             Get started with Google
