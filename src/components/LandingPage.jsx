@@ -96,8 +96,6 @@ export default function LandingPage({ onLogin }) {
           <span style={s.heroAccent}>platform-ready posts</span>
         </h1>
         <div style={{ ...heroItem(240), display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <h2 style={{ ...s.sectionTitle, marginBottom: '8px' }}>Simple pricing</h2>
-          <p style={{ ...s.heroPricingSubtitle, marginBottom: '24px' }}>One plan. Everything included. No surprises.</p>
           <div style={s.heroPricingCard}>
             <div style={s.heroPricingAmount}>
               <span style={s.heroPricingDollar}>$20.91</span>
