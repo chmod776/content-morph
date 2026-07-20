@@ -7,6 +7,7 @@ import SettingsPanel from './components/SettingsPanel';
 import HistoryPanel from './components/HistoryPanel';
 import OnboardingModal from './components/OnboardingModal';
 import PricingPage from './components/PricingPage';
+import YouTubePrepPanel from './components/YouTubePrepPanel';
 import { platforms } from './platforms';
 import { useSettings } from './context/SettingsContext';
 import { useProfile } from './context/ProfileContext';
@@ -41,6 +42,7 @@ export default function App() {
   const [showPaymentFailedBanner, setShowPaymentFailedBanner] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [showSessionExpiredModal, setShowSessionExpiredModal] = useState(false);
+  const [youtubePrepOpen, setYoutubePrepOpen] = useState(false);
 
   // Restore any draft the user had when their session expired
   useEffect(() => {
@@ -371,6 +373,7 @@ export default function App() {
           onGenerate={handleGenerate}
           onSettingsOpen={() => setSettingsOpen(true)}
           onHistoryOpen={() => setHistoryOpen(true)}
+          onYouTubeOpen={() => setYoutubePrepOpen(true)}
           historyCount={history.length}
           settingsRef={settingsRef}
           gearPulse={gearPulse}
@@ -405,6 +408,7 @@ export default function App() {
       </footer>
 
       <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} subscription={subscription} />
+      <YouTubePrepPanel isOpen={youtubePrepOpen} onClose={() => setYoutubePrepOpen(false)} />
       <HistoryPanel
         isOpen={historyOpen}
         onClose={() => setHistoryOpen(false)}

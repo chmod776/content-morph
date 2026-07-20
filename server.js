@@ -7,6 +7,8 @@ import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { spawn } from 'child_process';
+import crypto from 'crypto';
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync, getUncachableStripeClient } from './stripeClient.js';
 import { WebhookHandlers } from './webhookHandlers.js';
@@ -52,7 +54,78 @@ async function initDb() {
       created_at        TIMESTAMP DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_history_user_id ON history(user_id);
+
+    CREATE TABLE IF NOT EXISTS video_usage (
+      user_id     TEXT     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      year_month  CHAR(7)  NOT NULL,
+      minutes_used NUMERIC DEFAULT 0,
+      grace_used  BOOLEAN  DEFAULT FALSE,
+      PRIMARY KEY (user_id, year_month)
+    );
   `);
+}
+
+// ── Tmp file cleanup sweep ────────────────────────────────────────────────────
+// Deletes any /tmp/cm-* files older than 10 minutes. Runs at startup and hourly
+// as a safety net in case a request-level cleanup ever fails silently.
+function cleanupTmpFiles() {
+  const tenMinAgo = Date.now() - 10 * 60 * 1000;
+  try {
+    const files = fs.readdirSync('/tmp').filter(f => f.startsWith('cm-'));
+    for (const file of files) {
+      const full = path.join('/tmp', file);
+      try {
+        if (fs.statSync(full).mtimeMs < tenMinAgo) {
+          fs.unlinkSync(full);
+          console.log('[cleanup] removed orphaned tmp file:', file);
+        }
+      } catch {}
+    }
+  } catch (err) {
+    console.warn('[cleanup] scan failed:', err.message);
+  }
+}
+cleanupTmpFiles();
+setInterval(cleanupTmpFiles, 60 * 60 * 1000);
+
+// ── ffprobe / ffmpeg helpers ──────────────────────────────────────────────────
+function getVideoDuration(filePath) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('ffprobe', ['-v', 'quiet', '-print_format', 'json', '-show_format', filePath]);
+    let out = '';
+    proc.stdout.on('data', d => { out += d; });
+    proc.on('close', code => {
+      if (code !== 0) return reject(new Error('ffprobe failed'));
+      try { resolve(parseFloat(JSON.parse(out).format?.duration || '0')); }
+      catch (e) { reject(e); }
+    });
+  });
+}
+
+function extractAudio(videoPath, audioPath) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('ffmpeg', [
+      '-i', videoPath, '-vn',
+      '-acodec', 'libmp3lame', '-q:a', '5', '-ac', '1', '-ar', '16000',
+      '-y', audioPath,
+    ]);
+    let stderr = '';
+    proc.stderr.on('data', d => { stderr += d; });
+    proc.on('close', code => {
+      if (code !== 0) return reject(new Error('Audio extraction failed: ' + stderr.slice(-300)));
+      resolve();
+    });
+  });
+}
+
+function safeDelete(...paths) {
+  for (const p of paths) { try { if (p) fs.unlinkSync(p); } catch {} }
+}
+
+function formatTimestamp(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 // ── Supabase admin client (server-side only, uses service role key) ───────────
@@ -121,7 +194,9 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 });
 
 // ── JSON body parser ──────────────────────────────────────────────────────────
-app.use(express.json());
+// 10 MB limit to accommodate full video transcripts sent to /api/youtube/generate.
+// All routes require authentication, so the larger limit is safe.
+app.use(express.json({ limit: '10mb' }));
 
 // ── POST /api/auth/sync ───────────────────────────────────────────────────────
 app.post('/api/auth/sync', isAuthenticated, async (req, res) => {
@@ -432,6 +507,228 @@ app.post('/api/profile/extract-text', isAuthenticated, (req, res, next) => {
       res.status(500).json({ message: 'Failed to extract text from file' });
     }
   });
+});
+
+// ── YouTube video upload multer (disk storage — videos can be large) ──────────
+const videoUpload = multer({
+  storage: multer.diskStorage({
+    destination: '/tmp',
+    filename: (_, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase() || '.mp4';
+      cb(null, `cm-${crypto.randomUUID()}-video${ext}`);
+    },
+  }),
+  limits: { fileSize: 4 * 1024 * 1024 * 1024 }, // 4 GB
+  fileFilter: (_, file, cb) => {
+    const allowed = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v', '.wmv'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext)) cb(null, true);
+    else cb(new Error(`Unsupported video type "${ext}". Use .mp4, .mov, .mkv, .webm, or .m4v`));
+  },
+});
+
+// ── GET /api/youtube/usage ────────────────────────────────────────────────────
+app.get('/api/youtube/usage', isAuthenticated, async (req, res) => {
+  try {
+    const yearMonth = new Date().toISOString().slice(0, 7);
+    const { rows } = await pool.query(
+      'SELECT minutes_used, grace_used FROM video_usage WHERE user_id=$1 AND year_month=$2',
+      [req.user.id, yearMonth]
+    );
+    const now = new Date();
+    const resetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+    res.json({
+      minutesUsed: parseFloat(rows[0]?.minutes_used || 0),
+      monthlyLimit: 360,
+      graceUsed: rows[0]?.grace_used || false,
+      resetDate,
+    });
+  } catch (err) {
+    console.error('YouTube usage error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch usage' });
+  }
+});
+
+// ── POST /api/youtube/upload ──────────────────────────────────────────────────
+// Accepts a video file, extracts audio with ffmpeg, transcribes with Whisper.
+// Video and audio files are deleted immediately at each step (including on error).
+app.post('/api/youtube/upload', isAuthenticated, (req, res, next) => {
+  videoUpload.single('video')(req, res, async (multerErr) => {
+    if (multerErr) return res.status(400).json({ error: multerErr.message });
+    if (!req.file) return res.status(400).json({ error: 'No video file uploaded' });
+
+    const videoPath = req.file.path;
+    const audioPath = `/tmp/cm-${crypto.randomUUID()}-audio.mp3`;
+
+    try {
+      // ── Duration check ──
+      const durationSec = await getVideoDuration(videoPath);
+      const durationMin = durationSec / 60;
+      if (durationMin > 90) {
+        safeDelete(videoPath);
+        return res.status(400).json({
+          error: `Video is ${Math.round(durationMin)} minutes — the limit is 90 minutes per upload.`,
+        });
+      }
+
+      // ── Monthly cap check ──
+      const yearMonth = new Date().toISOString().slice(0, 7);
+      const { rows } = await pool.query(
+        'SELECT minutes_used, grace_used FROM video_usage WHERE user_id=$1 AND year_month=$2',
+        [req.user.id, yearMonth]
+      );
+      const currentMin = parseFloat(rows[0]?.minutes_used || 0);
+      const graceUsed  = rows[0]?.grace_used || false;
+      const MONTHLY_CAP = 360;
+      const wouldExceed = (currentMin + durationMin) > MONTHLY_CAP;
+
+      if (wouldExceed && graceUsed) {
+        safeDelete(videoPath);
+        const resetDate = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1);
+        const formatted = resetDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+        return res.status(429).json({
+          error: 'monthly_cap_exceeded',
+          message: `You've used your video processing for this month. New uploads will be available again on ${formatted}. Everything else in Content Morph, including unlimited text generation, is still available.`,
+          resetDate: resetDate.toISOString(),
+        });
+      }
+      const warnGrace = wouldExceed && !graceUsed;
+
+      // ── Extract audio, delete video immediately ──
+      await extractAudio(videoPath, audioPath);
+      safeDelete(videoPath);
+
+      // ── File size guard (Whisper limit: 25 MB) ──
+      const audioSize = fs.statSync(audioPath).size;
+      if (audioSize > 24 * 1024 * 1024) {
+        safeDelete(audioPath);
+        return res.status(400).json({ error: 'Extracted audio exceeds 24 MB. Please trim the video.' });
+      }
+
+      // ── Whisper transcription ──
+      const openaiKey = process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY;
+      const audioBuffer = fs.readFileSync(audioPath);
+      const audioBlob   = new Blob([audioBuffer], { type: 'audio/mpeg' });
+      const formData    = new FormData();
+      formData.append('file', audioBlob, 'audio.mp3');
+      formData.append('model', 'whisper-1');
+      formData.append('response_format', 'verbose_json');
+      formData.append('timestamp_granularities[]', 'segment');
+
+      const whisperRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${openaiKey}` },
+        body: formData,
+      });
+
+      // Delete audio regardless of Whisper outcome
+      safeDelete(audioPath);
+
+      if (!whisperRes.ok) {
+        const errText = await whisperRes.text();
+        return res.status(502).json({ error: `Transcription failed: ${errText}` });
+      }
+
+      const whisperData = await whisperRes.json();
+      const transcript  = whisperData.text || '';
+      const segments    = (whisperData.segments || []).map(s => ({
+        start: s.start, end: s.end, text: s.text,
+      }));
+
+      // ── Update usage ──
+      await pool.query(
+        `INSERT INTO video_usage (user_id, year_month, minutes_used, grace_used)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (user_id, year_month) DO UPDATE SET
+           minutes_used = video_usage.minutes_used + EXCLUDED.minutes_used,
+           grace_used   = video_usage.grace_used OR EXCLUDED.grace_used`,
+        [req.user.id, yearMonth, durationMin, warnGrace]
+      );
+
+      res.json({
+        transcript, segments,
+        durationMin: Math.round(durationMin * 10) / 10,
+        warnGrace,
+        warnMessage: warnGrace
+          ? `You've used your 6 hours of video processing this month — this upload will still go through, but you're now over your monthly allotment. Everything else in Content Morph is still available.`
+          : null,
+      });
+    } catch (err) {
+      // Final safety net: delete any remaining tmp files
+      safeDelete(videoPath, audioPath);
+      console.error('YouTube upload error:', err.message);
+      res.status(500).json({ error: err.message || 'Processing failed' });
+    }
+  });
+});
+
+// ── POST /api/youtube/generate ────────────────────────────────────────────────
+// A 90-min transcript can be ~200 KB of JSON (text + segment objects).
+// Apply a route-specific 10 MB limit instead of the global 100 KB default.
+app.post('/api/youtube/generate', isAuthenticated, express.json({ limit: '10mb' }), async (req, res) => {
+  const { transcript, isVideoTranscript, segments } = req.body;
+  if (!transcript) return res.status(400).json({ error: 'transcript is required' });
+
+  const openaiKey = process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY;
+  if (!openaiKey) return res.status(500).json({ error: 'OpenAI API key not configured' });
+
+  const profileResult = await pool.query(
+    'SELECT brand_voice, writing_samples FROM profiles WHERE user_id=$1',
+    [req.user.id]
+  );
+  const profile = profileResult.rows[0] || {};
+  const brandVoice    = profile.brand_voice || '';
+  const writingSamples = profile.writing_samples || [];
+
+  // Attach timestamp segments so the model can anchor chapters accurately
+  let segmentsContext = '';
+  if (isVideoTranscript && segments?.length > 0) {
+    segmentsContext = '\n\nTimestamp segments:\n' +
+      segments.map(s => `[${formatTimestamp(s.start)}] ${s.text.trim()}`).join('\n');
+  }
+
+  const chaptersBlock = isVideoTranscript
+    ? `###CHAPTERS###\n3–20 chapters based on natural topic breaks. MUST start with 0:00. Each chapter ≥10 seconds apart.\nFormat: 0:00 Chapter Title (one per line, nothing else)`
+    : `###CHAPTERS###\nDraft structure (no real video yet). Use this exact header on line 1: "DRAFT STRUCTURE — add real timestamps after editing"\nThen list 4–8 logical sections like:\n0:00 Introduction\n2:00 [Section Name]`;
+
+  let systemPrompt =
+    `You are an expert YouTube content strategist. Generate a complete YouTube pre-publish package.\n` +
+    (brandVoice.trim() ? `\nBRAND VOICE — apply to title and description: "${brandVoice.trim()}"` : '') +
+    (writingSamples.length > 0
+      ? `\n\nWRITING SAMPLES — mirror this style:\n${writingSamples.map((s,i)=>`Sample ${i+1}:\n${s.trim()}`).join('\n\n---\n\n')}`
+      : '') +
+    `\n\nRespond in EXACTLY this format — no text before or after the markers:\n\n` +
+    `###TITLE###\n[Compelling title, max 70 chars, no clickbait]\n\n` +
+    `###DESCRIPTION###\n[Hook in first 2 lines. Body with key points. CTA at end. Human voice, no AI clichés. Under 5000 chars.]\n\n` +
+    chaptersBlock;
+
+  try {
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Content:\n${transcript}${segmentsContext}` },
+        ],
+        stream: true,
+      }),
+    });
+
+    if (!openaiRes.ok) {
+      const errText = await openaiRes.text();
+      return res.status(502).json({ error: `OpenAI error: ${errText}` });
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    openaiRes.body.pipe(res);
+  } catch (err) {
+    console.error('YouTube generate error:', err.message);
+    res.status(500).json({ error: 'Generation failed' });
+  }
 });
 
 // ── Serve Vite build in production ────────────────────────────────────────────
