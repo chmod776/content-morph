@@ -41,7 +41,7 @@ export default function LandingPage({ onLogin }) {
         <div style={s.steps}>
           {[
             { n: '1', title: 'Paste your notes', desc: 'Dump your raw ideas, bullet points, or a rough draft. No polish needed.' },
-            { n: '2', title: 'Pick your platforms', desc: 'Select LinkedIn, Twitter/X, Instagram, Facebook, or all of them at once.' },
+            { n: '2', title: 'Pick your platforms', desc: 'Select LinkedIn, X, Instagram, YouTube, or all of them at once.' },
             { n: '3', title: 'Get ready-to-post content', desc: 'Your notes are rewritten into platform-native copy, streamed live to your screen.' },
           ].map(step => (
             <div key={step.n} style={s.step}>
@@ -59,7 +59,7 @@ export default function LandingPage({ onLogin }) {
         <div style={s.features}>
           {[
             { icon: '✦', title: 'Unlimited generations', desc: 'Run as many generations as you want. No caps, no credits.' },
-            { icon: '🎯', title: 'All major platforms', desc: 'LinkedIn, Twitter/X, Instagram, Facebook, YouTube, TikTok, and more.' },
+            { icon: '🎯', title: 'All major platforms', desc: 'LinkedIn, X, Instagram, and YouTube.' },
             { icon: '🗣️', title: 'Brand voice', desc: 'Set your tone once. Every post sounds like you, not a robot.' },
             { icon: '✍️', title: 'Writing samples', desc: 'Upload examples of your writing and every post mirrors your style exactly.' },
             { icon: '📋', title: 'Generation history', desc: 'Every output is saved so you can revisit, tweak, or repost anything.' },
@@ -86,7 +86,7 @@ export default function LandingPage({ onLogin }) {
           <ul style={s.pricingList}>
             {[
               'Unlimited content generations',
-              'All platforms: LinkedIn, Twitter, Instagram & more',
+              'All platforms: LinkedIn, X, Instagram & YouTube',
               'Brand voice & writing samples',
               'Full generation history',
               'Live streaming output',
