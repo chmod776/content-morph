@@ -49,3 +49,7 @@ build = ["npm", "run", "build"]
 publicDir = "dist"
 
 [userenv]
+
+[userenv.shared]
+VITE_SUPABASE_URL = "https://tgeqxuukgwykzugevlbl.supabase.co/rest/v1/"
+VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZXF4dXVrZ3d5a3p1Z2V2bGJsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NDgxNjYsImV4cCI6MjA5NTMyNDE2Nn0.l-GCPaJkLc1EMvIhmTNYudoNtPlXkfXKHAaqS-AB-m4"
