@@ -38,6 +38,7 @@ export default function App() {
   const [subscription, setSubscription]         = useState(null);
   const [subLoading, setSubLoading]             = useState(true);
   const [showCheckoutBanner, setShowCheckoutBanner] = useState(false);
+  const [showPastDueBanner, setShowPastDueBanner] = useState(false);
   const [showPaymentFailedBanner, setShowPaymentFailedBanner] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
 
@@ -95,11 +96,15 @@ export default function App() {
     }
   }, [subscription]);
 
-  // Show payment-failed banner only for known Stripe lapsed/failed statuses
-  // This avoids triggering on unknown or error-fallback states
-  const LAPSED_STATUSES = new Set(['past_due', 'canceled', 'unpaid', 'incomplete_expired', 'paused']);
+  // past_due = grace period, user still has access — show a softer "fix soon" warning
+  // All other lapsed statuses = access gone — show the harder "resubscribe" banner
+  const PAST_DUE_STATUS  = 'past_due';
+  const LAPSED_STATUSES  = new Set(['canceled', 'unpaid', 'incomplete_expired', 'paused']);
   useEffect(() => {
-    if (subscription && !subscription.active && LAPSED_STATUSES.has(subscription.status)) {
+    if (!subscription || subscription.active) return;
+    if (subscription.status === PAST_DUE_STATUS) {
+      setShowPastDueBanner(true);
+    } else if (LAPSED_STATUSES.has(subscription.status)) {
       setShowPaymentFailedBanner(true);
     }
   }, [subscription]);
@@ -133,7 +138,6 @@ export default function App() {
 
   const paymentFailedMessage = () => {
     const status = subscription?.status;
-    if (status === 'past_due') return 'Your last payment failed.';
     if (status === 'canceled') return 'Your subscription has been canceled.';
     if (status === 'unpaid') return 'Your subscription is unpaid.';
     if (status === 'incomplete_expired') return 'Your subscription setup did not complete.';
@@ -346,6 +350,19 @@ export default function App() {
         <div style={styles.checkoutBanner}>
           <span style={styles.checkoutBannerText}>🎉 You're subscribed! Welcome to ContentMorph.</span>
           <button style={styles.checkoutBannerClose} onClick={() => setShowCheckoutBanner(false)} aria-label="Dismiss">✕</button>
+        </div>
+      )}
+      {showPastDueBanner && (
+        <div style={styles.pastDueBanner}>
+          <span style={styles.pastDueBannerIcon}>⏰</span>
+          <span style={styles.pastDueBannerText}>
+            Your payment is overdue — please{' '}
+            <button style={styles.pastDueBannerLink} onClick={handleOpenPortal} disabled={portalLoading}>
+              {portalLoading ? 'Opening…' : 'update your card'}
+            </button>
+            {' '}before you lose access.
+          </span>
+          <button style={styles.pastDueBannerClose} onClick={() => setShowPastDueBanner(false)} aria-label="Dismiss">✕</button>
         </div>
       )}
       {showPaymentFailedBanner && (
@@ -578,6 +595,55 @@ const styles = {
     background: 'none',
     border: 'none',
     color: '#e8a0a0',
+    cursor: 'pointer',
+    fontSize: '0.85rem',
+    padding: '0 2px',
+    opacity: 0.7,
+    lineHeight: 1,
+    flexShrink: 0,
+  },
+  pastDueBanner: {
+    position: 'fixed',
+    top: '20px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    zIndex: 400,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    backgroundColor: '#2e2510',
+    border: '1px solid #7a5e20',
+    borderRadius: '10px',
+    padding: '12px 18px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+    animation: 'fadeSlideIn 0.25s ease-out',
+    maxWidth: '90vw',
+  },
+  pastDueBannerIcon: {
+    fontSize: '1rem',
+    flexShrink: 0,
+  },
+  pastDueBannerText: {
+    fontSize: '0.9rem',
+    color: '#e8c97a',
+    fontFamily: 'var(--font-body)',
+    lineHeight: 1.45,
+  },
+  pastDueBannerLink: {
+    background: 'none',
+    border: 'none',
+    color: '#f0dc9a',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.9rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    padding: 0,
+    textDecoration: 'underline',
+  },
+  pastDueBannerClose: {
+    background: 'none',
+    border: 'none',
+    color: '#e8c97a',
     cursor: 'pointer',
     fontSize: '0.85rem',
     padding: '0 2px',
