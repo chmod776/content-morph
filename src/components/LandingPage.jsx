@@ -228,7 +228,7 @@ const s = {
   hero: {
     maxWidth: '720px',
     margin: '0 auto',
-    padding: '100px 24px 80px',
+    padding: '48px 24px 80px',
     textAlign: 'center',
   },
   heroBadge: {
