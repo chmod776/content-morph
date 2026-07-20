@@ -138,6 +138,22 @@ export default function SettingsPanel({ isOpen, onClose, subscription }) {
     { value: 'detailed', label: t.detailedLabel, desc: t.detailedDesc },
   ];
 
+  const subBadge = (() => {
+    const s = subscription?.status;
+    if (!s) return null;
+    if (s === 'active' || s === 'trialing')
+      return { label: s === 'trialing' ? 'Trial' : 'Active', color: '#6ee07a', bg: 'rgba(110,224,122,0.12)', border: 'rgba(110,224,122,0.35)' };
+    if (s === 'past_due')
+      return { label: 'Payment overdue', color: '#e8c97a', bg: 'rgba(232,201,122,0.12)', border: 'rgba(232,201,122,0.35)' };
+    if (s === 'canceled')
+      return { label: 'Canceled', color: '#e88a8a', bg: 'rgba(232,138,138,0.12)', border: 'rgba(232,138,138,0.35)' };
+    if (s === 'unpaid')
+      return { label: 'Unpaid', color: '#e88a8a', bg: 'rgba(232,138,138,0.12)', border: 'rgba(232,138,138,0.35)' };
+    if (s === 'paused')
+      return { label: 'Paused', color: 'var(--text-muted)', bg: 'rgba(255,255,255,0.05)', border: 'var(--border-color)' };
+    return { label: s, color: 'var(--text-muted)', bg: 'rgba(255,255,255,0.05)', border: 'var(--border-color)' };
+  })();
+
   if (!isOpen) return null;
 
   return (
@@ -375,6 +391,11 @@ export default function SettingsPanel({ isOpen, onClose, subscription }) {
             <div style={styles.sectionHeader}>
               <CreditCard size={16} style={{ marginRight: '8px', color: 'var(--text-muted)' }} />
               <h3 style={styles.sectionTitle}>Billing</h3>
+              {subBadge && (
+                <span style={{ ...styles.subBadge, color: subBadge.color, backgroundColor: subBadge.bg, borderColor: subBadge.border }}>
+                  {subBadge.label}
+                </span>
+              )}
             </div>
             {subscription?.status !== null && subscription?.status !== undefined ? (
               <>
@@ -430,4 +451,5 @@ const styles = {
   lengthOption: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderRadius: '8px', border: '1px solid', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: '0.92rem', transition: 'all 0.15s', textAlign: 'left', gap: '16px', overflow: 'hidden' },
   platformChip: { padding: '8px 16px', borderRadius: '20px', border: '1px solid', cursor: 'pointer', fontSize: '0.88rem', fontFamily: 'var(--font-body)', fontWeight: '500', transition: 'all 0.15s' },
   billingBtn: { display: 'inline-flex', alignItems: 'center', backgroundColor: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '8px', padding: '9px 18px', fontSize: '0.88rem', fontFamily: 'var(--font-body)', fontWeight: '500', cursor: 'pointer', transition: 'border-color 0.15s, color 0.15s' },
+  subBadge: { marginLeft: '10px', display: 'inline-block', padding: '2px 9px', borderRadius: '20px', border: '1px solid', fontSize: '0.73rem', fontFamily: 'var(--font-body)', fontWeight: '600', letterSpacing: '0.01em' },
 };
