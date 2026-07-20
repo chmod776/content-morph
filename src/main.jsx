@@ -1,14 +1,14 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
-import SignInPage from './components/SignInPage.jsx';
+import LandingPage from './components/LandingPage.jsx';
 import { SettingsProvider } from './context/SettingsContext.jsx';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { ProfileProvider } from './context/ProfileContext.jsx';
 import './index.css';
 
 function Root() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, login } = useAuth();
 
   if (loading) {
     return (
@@ -28,7 +28,7 @@ function Root() {
   }
 
   if (!isAuthenticated) {
-    return <SignInPage />;
+    return <LandingPage onLogin={login} />;
   }
 
   return (
