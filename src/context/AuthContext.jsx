@@ -24,8 +24,18 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session on mount
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Restore session on mount. If the stored token is expired and cannot be
+    // refreshed (e.g. the user was offline for too long), getSession resolves
+    // with a null session rather than throwing — we treat that as signed-out.
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        // Unrecoverable session error — clear state and let the user sign in again.
+        console.warn('Session restore error:', error.message);
+        supabase.auth.signOut();   // purge the stale token from storage
+        setUser(null);
+        setLoading(false);
+        return;
+      }
       if (session) {
         syncUser(session).then(setUser).finally(() => setLoading(false));
       } else {
@@ -33,14 +43,32 @@ export function AuthProvider({ children }) {
       }
     });
 
-    // Listen for auth state changes (sign-in, sign-out, token refresh)
+    // Listen for auth state changes (sign-in, sign-out, token refresh, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
+          // Fired on initial sign-in and after an OAuth redirect.
           const synced = await syncUser(session);
           setUser(synced);
           setLoading(false);
+        } else if (event === 'INITIAL_SESSION') {
+          // Fired once on load when Supabase has finished restoring a persisted
+          // session. If there's no valid session, session is null — sign-out.
+          if (session) {
+            const synced = await syncUser(session);
+            setUser(synced);
+          } else {
+            setUser(null);
+          }
+          setLoading(false);
+        } else if (event === 'TOKEN_REFRESHED' && session) {
+          // The access token was silently refreshed — update user state so any
+          // downstream fetch calls use the latest token.
+          const synced = await syncUser(session);
+          setUser(synced);
         } else if (event === 'SIGNED_OUT') {
+          // Explicit sign-out or an expired refresh token that Supabase could
+          // not renew — clear state cleanly so the app redirects to sign-in.
           setUser(null);
           setLoading(false);
         }

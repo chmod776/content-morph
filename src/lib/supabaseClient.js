@@ -12,4 +12,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    // Persist the session in localStorage so users stay signed in across page loads.
+    persistSession: true,
+    // Automatically refresh the access token before it expires.
+    autoRefreshToken: true,
+    // Detect the OAuth redirect callback on page load.
+    detectSessionInUrl: true,
+  },
+});
