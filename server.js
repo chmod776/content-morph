@@ -1,5 +1,7 @@
 import express from 'express';
 import { createClient } from '@supabase/supabase-js';
+import { WebSocket } from 'ws';
+if (!globalThis.WebSocket) globalThis.WebSocket = WebSocket;
 import pg from 'pg';
 import multer from 'multer';
 import path from 'path';
@@ -54,14 +56,17 @@ async function initDb() {
 }
 
 // ── Supabase admin client (server-side only, uses service role key) ───────────
-function getSupabaseAdmin() {
-  const url        = process.env.SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceKey) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
-  return createClient(url, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+// Singleton — created once at startup so the Realtime WebSocket warning never
+// fires inside the auth middleware's try/catch (which would incorrectly 401).
+const _supabaseAdminUrl        = process.env.SUPABASE_URL;
+const _supabaseAdminServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!_supabaseAdminUrl || !_supabaseAdminServiceKey) {
+  throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
 }
+const supabaseAdmin = createClient(_supabaseAdminUrl, _supabaseAdminServiceKey, {
+  auth: { autoRefreshToken: false, persistSession: false },
+});
+function getSupabaseAdmin() { return supabaseAdmin; }
 
 // ── Auth middleware — verifies Supabase JWT ───────────────────────────────────
 const isAuthenticated = async (req, res, next) => {
