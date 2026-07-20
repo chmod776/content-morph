@@ -170,6 +170,42 @@ export default function LandingPage({ onLogin }) {
         </div>
       </section>
 
+      {/* PRICING */}
+      <section style={{ ...s.section, ...s.pricingSection }}>
+        <Reveal>
+          <h2 style={s.sectionTitle}>Simple pricing</h2>
+          <p style={s.pricingSubtitle}>One plan. Everything included. No surprises.</p>
+        </Reveal>
+        <Reveal delay={100}>
+          <div style={s.pricingCard}>
+            <div style={s.pricingAmount}>
+              <span style={s.pricingDollar}>$20.91</span>
+              <span style={s.pricingPer}> / month</span>
+            </div>
+            <ul style={s.pricingList}>
+              {[
+                'Unlimited content generations',
+                'All platforms: LinkedIn, X, Instagram & YouTube',
+                'Brand voice & writing samples',
+                'Full generation history',
+                'Live streaming output',
+                'Cancel anytime from your account',
+              ].map(item => (
+                <li key={item} style={s.pricingItem}>
+                  <span style={s.pricingCheck}>✓</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <button style={s.pricingCta} onClick={onLogin}>
+              <GoogleIcon />
+              Get started with Google
+            </button>
+            <p style={s.pricingSecure}>Secured by Stripe · Cancel anytime</p>
+          </div>
+        </Reveal>
+      </section>
+
       {/* FOOTER */}
       <footer style={s.footer}>
         <p style={s.footerText}>
