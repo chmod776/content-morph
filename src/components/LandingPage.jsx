@@ -60,6 +60,7 @@ function RevealCard({ children, delay = 0, cardStyle = {} }) {
 }
 
 export default function LandingPage({ onLogin, onPrivacy }) {
+  const [agreed, setAgreed] = React.useState(false);
   const [emailCopied, setEmailCopied] = useState(false);
 
   // Hero elements animate in on mount, staggered
@@ -166,7 +167,26 @@ export default function LandingPage({ onLogin, onPrivacy }) {
                 </li>
               ))}
             </ul>
-            <button style={s.pricingCta} onClick={onLogin}>
+            <label style={s.agreeRow}>
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={e => setAgreed(e.target.checked)}
+                style={s.agreeCheckbox}
+              />
+              <span style={s.agreeText}>
+                I agree to the{' '}
+                <button style={s.agreeLink} onClick={e => { e.preventDefault(); onPrivacy(); }}>
+                  Privacy Policy
+                </button>
+              </span>
+            </label>
+            <button
+              style={{ ...s.pricingCta, ...(agreed ? {} : s.pricingCtaDisabled) }}
+              onClick={agreed ? onLogin : undefined}
+              disabled={!agreed}
+              title={agreed ? undefined : 'Please agree to the Privacy Policy first'}
+            >
               <GoogleIcon />
               Get started with Google
             </button>
@@ -564,5 +584,39 @@ const s = {
     cursor: 'pointer',
     padding: 0,
     opacity: 0.6,
+  },
+  agreeRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    margin: '20px 0 14px',
+    cursor: 'pointer',
+  },
+  agreeCheckbox: {
+    width: '16px',
+    height: '16px',
+    flexShrink: 0,
+    cursor: 'pointer',
+    accentColor: 'var(--text-main)',
+  },
+  agreeText: {
+    fontSize: '0.84rem',
+    color: 'var(--text-muted)',
+    lineHeight: 1.4,
+    fontFamily: 'var(--font-body)',
+  },
+  agreeLink: {
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    color: 'var(--text-main)',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.84rem',
+    textDecoration: 'underline',
+    cursor: 'pointer',
+  },
+  pricingCtaDisabled: {
+    opacity: 0.4,
+    cursor: 'not-allowed',
   },
 };

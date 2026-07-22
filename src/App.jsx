@@ -410,6 +410,7 @@ export default function App({ onPrivacy }) {
         user={user}
         onLogout={logout}
         checkoutCancelled={checkoutCancelledRef.current}
+        onPrivacy={onPrivacy}
       />
     );
   }

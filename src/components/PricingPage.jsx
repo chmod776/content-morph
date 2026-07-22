@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { apiFetch } from '../utils/apiFetch';
 
-export default function PricingPage({ user, onLogout, checkoutCancelled }) {
+export default function PricingPage({ user, onLogout, checkoutCancelled, onPrivacy }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [agreed, setAgreed] = useState(false);
 
   const handleSubscribe = async () => {
     setLoading(true);
@@ -54,7 +55,27 @@ export default function PricingPage({ user, onLogout, checkoutCancelled }) {
 
         {error && <p style={styles.error}>{error}</p>}
 
-        <button style={styles.subscribeBtn} onClick={handleSubscribe} disabled={loading}>
+        <label style={styles.agreeRow}>
+          <input
+            type="checkbox"
+            checked={agreed}
+            onChange={e => setAgreed(e.target.checked)}
+            style={styles.agreeCheckbox}
+          />
+          <span style={styles.agreeText}>
+            I agree to the{' '}
+            <button style={styles.agreeLink} onClick={e => { e.preventDefault(); onPrivacy?.(); }}>
+              Privacy Policy
+            </button>
+          </span>
+        </label>
+
+        <button
+          style={{ ...styles.subscribeBtn, ...(!agreed || loading ? styles.subscribeBtnDisabled : {}) }}
+          onClick={agreed ? handleSubscribe : undefined}
+          disabled={!agreed || loading}
+          title={agreed ? undefined : 'Please agree to the Privacy Policy first'}
+        >
           {loading ? 'Redirecting…' : 'Subscribe now'}
         </button>
 
@@ -196,5 +217,40 @@ const styles = {
     textDecoration: 'underline',
     padding: 0,
     flexShrink: 0,
+  },
+  agreeRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    margin: '0 0 16px',
+    cursor: 'pointer',
+    textAlign: 'left',
+  },
+  agreeCheckbox: {
+    width: '16px',
+    height: '16px',
+    flexShrink: 0,
+    cursor: 'pointer',
+    accentColor: 'var(--text-main)',
+  },
+  agreeText: {
+    fontSize: '0.84rem',
+    color: 'var(--text-muted)',
+    lineHeight: 1.4,
+    fontFamily: 'var(--font-body)',
+  },
+  agreeLink: {
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    color: 'var(--text-main)',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.84rem',
+    textDecoration: 'underline',
+    cursor: 'pointer',
+  },
+  subscribeBtnDisabled: {
+    opacity: 0.4,
+    cursor: 'not-allowed',
   },
 };
