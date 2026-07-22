@@ -473,23 +473,19 @@ app.delete('/api/account', isAuthenticated, async (req, res) => {
       }
     }
 
-    // 2. Remove the Supabase auth record
+    // 2. Remove the Supabase auth record.
+    //    isAuthenticated may overwrite user.id with the DB's stable id, so
+    //    extract the real Supabase UUID directly from the JWT sub claim.
     try {
-      await getSupabaseAdmin().auth.admin.deleteUser(userId);
+      const token = req.headers['authorization']?.slice(7) || '';
+      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+      await getSupabaseAdmin().auth.admin.deleteUser(payload.sub);
     } catch (sbErr) {
       console.warn('Account deletion: Supabase deleteUser failed:', sbErr.message);
     }
 
-    // 3. Destroy session FIRST, then delete from DB inside the callback.
-    //    This prevents the ON DELETE CASCADE on `sessions` from racing with
-    //    Express's own session finalisation (which would return HTML 500).
-    req.session.destroy(async () => {
-      try {
-        await pool.query('DELETE FROM users WHERE id=$1', [userId]);
-      } catch (dbErr) {
-        console.error('Account deletion: DB delete failed:', dbErr.message);
-      }
-    });
+    // 3. Delete all user data — CASCADE removes profiles, history, video_usage.
+    await pool.query('DELETE FROM users WHERE id=$1', [userId]);
 
     res.json({ ok: true });
   } catch (err) {
