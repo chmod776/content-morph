@@ -119,9 +119,6 @@ export default function YouTubeModal({ isOpen, onClose, onContinue }) {
 
         {mode === 'choose' && (
           <>
-            <p style={s.subtitle}>
-              You have YouTube selected. How should we generate your YouTube title, description, and chapters?
-            </p>
             <div style={s.choices}>
               <button style={s.choiceCard} onClick={() => onContinue(null)}>
                 <span style={s.choiceIcon}>✏️</span>
