@@ -460,10 +460,10 @@ export default function SettingsPanel({ isOpen, onClose, subscription, onAccount
           <section style={styles.section}>
             <div style={styles.sectionHeader}>
               <AlertTriangle size={15} style={{ marginRight: '8px', color: '#e88a8a' }} />
-              <h3 style={{ ...styles.sectionTitle, color: '#e88a8a' }}>Danger zone</h3>
+              <h3 style={{ ...styles.sectionTitle, color: '#e88a8a' }}>Close account</h3>
             </div>
             <p style={styles.sectionDesc}>
-              Permanently deletes your account, all your data, and cancels any active subscription. This cannot be undone.
+              Permanently deletes your account and all your data, and cancels any active subscription. This cannot be undone.
             </p>
             <button style={styles.deleteBtn} onClick={() => { setDeleteModal(true); setDeleteInput(''); setDeleteError(''); }}>
               <Trash2 size={14} style={{ marginRight: '7px' }} />
