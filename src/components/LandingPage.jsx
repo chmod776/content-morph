@@ -406,11 +406,15 @@ const s = {
 
   /* FEATURES */
   features: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+    display: 'flex',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: '24px',
   },
   featureCard: {
+    flex: '0 0 calc(33.333% - 16px)',
+    minWidth: '260px',
+    boxSizing: 'border-box',
     padding: '28px 24px',
     backgroundColor: 'var(--panel-bg)',
     border: '1px solid var(--border-color)',
