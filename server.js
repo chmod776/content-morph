@@ -449,6 +449,51 @@ app.post('/api/stripe/checkout', isAuthenticated, async (req, res) => {
   }
 });
 
+// ── DELETE /api/account ───────────────────────────────────────────────────────
+// Cancels Stripe subscription, wipes all user data, removes the Supabase auth
+// record, and destroys the session. Irreversible.
+app.delete('/api/account', isAuthenticated, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    // 1. Cancel any active Stripe subscriptions
+    const { rows } = await pool.query(
+      'SELECT stripe_customer_id FROM users WHERE id=$1', [userId]
+    );
+    const customerId = rows[0]?.stripe_customer_id;
+    if (customerId) {
+      try {
+        const stripe = await getUncachableStripeClient();
+        const { data: subs } = await stripe.subscriptions.list({
+          customer: customerId, status: 'active', limit: 10,
+        });
+        await Promise.all(subs.map(s => stripe.subscriptions.cancel(s.id)));
+      } catch (stripeErr) {
+        // Non-fatal — proceed with deletion even if Stripe is unreachable
+        console.warn('Account deletion: Stripe cancel failed:', stripeErr.message);
+      }
+    }
+
+    // 2. Delete all user data from Postgres (CASCADE removes profiles,
+    //    sessions, history, video_usage automatically)
+    await pool.query('DELETE FROM users WHERE id=$1', [userId]);
+
+    // 3. Remove the Supabase auth record
+    try {
+      await getSupabaseAdmin().auth.admin.deleteUser(userId);
+    } catch (sbErr) {
+      console.warn('Account deletion: Supabase deleteUser failed:', sbErr.message);
+    }
+
+    // 4. Destroy the Express session
+    req.session.destroy(() => {});
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Account deletion error:', err.message);
+    res.status(500).json({ error: 'Failed to delete account. Please try again.' });
+  }
+});
+
 // ── POST /api/stripe/portal ───────────────────────────────────────────────────
 app.post('/api/stripe/portal', isAuthenticated, async (req, res) => {
   try {

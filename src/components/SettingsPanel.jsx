@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Moon, Sun, Mic2, Globe, Layers, AlignLeft, Check, Upload, Trash2, BookOpen, CreditCard, ExternalLink } from 'lucide-react';
+import { X, Moon, Sun, Mic2, Globe, Layers, AlignLeft, Check, Upload, Trash2, BookOpen, CreditCard, ExternalLink, AlertTriangle } from 'lucide-react';
+import { apiFetch } from '../utils/apiFetch';
 import { useSettings } from '../context/SettingsContext';
 import { useProfile } from '../context/ProfileContext';
 import { platforms } from '../platforms';
@@ -13,13 +14,36 @@ const nativeLanguageNames = {
   Japanese: '日本語', Korean: '한국어', Mandarin: '中文',
 };
 
-export default function SettingsPanel({ isOpen, onClose, subscription }) {
+export default function SettingsPanel({ isOpen, onClose, subscription, onAccountDeleted }) {
   const { settings, updateSetting } = useSettings();
   const { profile, updateProfile } = useProfile();
   const t = useTranslation();
   const panelRef = useRef(null);
 
   const [portalLoading, setPortalLoading] = useState(false);
+
+  // ── Account deletion ──
+  const [deleteModal, setDeleteModal]   = useState(false);
+  const [deleteInput, setDeleteInput]   = useState('');
+  const [deleting, setDeleting]         = useState(false);
+  const [deleteError, setDeleteError]   = useState('');
+
+  const handleDeleteAccount = async () => {
+    if (deleteInput !== 'DELETE') return;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      const r = await apiFetch('/api/account', { method: 'DELETE' });
+      if (!r.ok) {
+        const d = await r.json();
+        throw new Error(d.error || 'Deletion failed');
+      }
+      onAccountDeleted?.();
+    } catch (err) {
+      setDeleteError(err.message);
+      setDeleting(false);
+    }
+  };
 
   const [draftVoice, setDraftVoice] = useState('');
   const [draftSamples, setDraftSamples] = useState(['', '', '']);
@@ -430,8 +454,64 @@ export default function SettingsPanel({ isOpen, onClose, subscription }) {
             )}
           </section>
 
+          <div style={styles.divider} />
+
+          {/* ── Danger zone ── */}
+          <section style={styles.section}>
+            <div style={styles.sectionHeader}>
+              <AlertTriangle size={15} style={{ marginRight: '8px', color: '#e88a8a' }} />
+              <h3 style={{ ...styles.sectionTitle, color: '#e88a8a' }}>Danger zone</h3>
+            </div>
+            <p style={styles.sectionDesc}>
+              Permanently deletes your account, all your data, and cancels any active subscription. This cannot be undone.
+            </p>
+            <button style={styles.deleteBtn} onClick={() => { setDeleteModal(true); setDeleteInput(''); setDeleteError(''); }}>
+              <Trash2 size={14} style={{ marginRight: '7px' }} />
+              Delete my account
+            </button>
+          </section>
+
         </div>
       </div>
+
+      {/* ── Delete confirmation modal ── */}
+      {deleteModal && (
+        <>
+          <div style={styles.modalBackdrop} onClick={() => !deleting && setDeleteModal(false)} />
+          <div style={styles.modalBox}>
+            <div style={styles.modalHeader}>
+              <AlertTriangle size={20} style={{ color: '#e88a8a' }} />
+              <h3 style={styles.modalTitle}>Delete account</h3>
+            </div>
+            <p style={styles.modalDesc}>
+              This will permanently delete your account, writing samples, brand voice, generation history, and cancel your subscription. There is no undo.
+            </p>
+            <p style={styles.modalConfirmLabel}>Type <strong>DELETE</strong> to confirm</p>
+            <input
+              style={{ ...styles.modalInput, borderColor: deleteInput === 'DELETE' ? '#e88a8a' : 'var(--border-color)' }}
+              value={deleteInput}
+              onChange={e => setDeleteInput(e.target.value)}
+              placeholder="DELETE"
+              disabled={deleting}
+              autoFocus
+              onKeyDown={e => e.key === 'Enter' && deleteInput === 'DELETE' && handleDeleteAccount()}
+            />
+            {deleteError && <p style={styles.modalError}>{deleteError}</p>}
+            <div style={styles.modalBtns}>
+              <button style={styles.modalCancel} onClick={() => setDeleteModal(false)} disabled={deleting}>
+                Cancel
+              </button>
+              <button
+                style={{ ...styles.modalConfirm, opacity: deleteInput === 'DELETE' && !deleting ? 1 : 0.4, cursor: deleteInput === 'DELETE' && !deleting ? 'pointer' : 'not-allowed' }}
+                onClick={handleDeleteAccount}
+                disabled={deleteInput !== 'DELETE' || deleting}
+              >
+                {deleting ? 'Deleting…' : 'Yes, delete everything'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }
@@ -469,4 +549,16 @@ const styles = {
   billingBtn: { display: 'inline-flex', alignItems: 'center', backgroundColor: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '8px', padding: '9px 18px', fontSize: '0.88rem', fontFamily: 'var(--font-body)', fontWeight: '500', cursor: 'pointer', transition: 'border-color 0.15s, color 0.15s' },
   subBadge: { marginLeft: '10px', display: 'inline-block', padding: '2px 9px', borderRadius: '20px', border: '1px solid', fontSize: '0.73rem', fontFamily: 'var(--font-body)', fontWeight: '600', letterSpacing: '0.01em' },
   subDateLine: { margin: '4px 0 12px', fontSize: '0.82rem', color: 'var(--text-muted)', fontFamily: 'var(--font-body)' },
+  deleteBtn: { display: 'flex', alignItems: 'center', padding: '9px 16px', backgroundColor: 'transparent', border: '1px solid rgba(232,138,138,0.4)', borderRadius: '8px', color: '#e88a8a', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: '0.88rem', fontWeight: '500', transition: 'border-color 0.15s' },
+  modalBackdrop: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 300, backdropFilter: 'blur(3px)' },
+  modalBox: { position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '440px', maxWidth: '92vw', backgroundColor: 'var(--panel-bg)', border: '1px solid rgba(232,138,138,0.35)', borderRadius: '18px', padding: '28px', zIndex: 301, display: 'flex', flexDirection: 'column', gap: '14px' },
+  modalHeader: { display: 'flex', alignItems: 'center', gap: '10px' },
+  modalTitle: { margin: 0, fontSize: '1.05rem', fontWeight: '700', fontFamily: 'var(--font-heading)', color: '#e88a8a' },
+  modalDesc: { margin: 0, fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: 1.6, fontFamily: 'var(--font-body)' },
+  modalConfirmLabel: { margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', fontFamily: 'var(--font-body)' },
+  modalInput: { width: '100%', boxSizing: 'border-box', padding: '10px 12px', backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-main)', fontFamily: 'var(--font-body)', fontSize: '0.9rem', outline: 'none', transition: 'border-color 0.15s' },
+  modalError: { margin: 0, fontSize: '0.82rem', color: '#e88a8a', fontFamily: 'var(--font-body)' },
+  modalBtns: { display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '4px' },
+  modalCancel: { padding: '9px 18px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: '0.88rem' },
+  modalConfirm: { padding: '9px 18px', borderRadius: '8px', border: 'none', background: '#c0392b', color: '#fff', fontFamily: 'var(--font-body)', fontSize: '0.88rem', fontWeight: '600', transition: 'opacity 0.15s' },
 };

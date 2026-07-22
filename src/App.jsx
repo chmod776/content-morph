@@ -492,7 +492,7 @@ export default function App() {
         <p style={styles.footerDisclaimer}>I read everything, but I can't respond to everyone. For billing issues, please use the Stripe customer portal.</p>
       </footer>
 
-      <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} subscription={subscription} />
+      <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} subscription={subscription} onAccountDeleted={logout} />
       <YouTubeModal
         isOpen={youtubeModal.open}
         onClose={() => setYoutubeModal(m => ({ ...m, open: false }))}
