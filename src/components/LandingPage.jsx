@@ -59,7 +59,7 @@ function RevealCard({ children, delay = 0, cardStyle = {} }) {
   );
 }
 
-export default function LandingPage({ onLogin }) {
+export default function LandingPage({ onLogin, onPrivacy }) {
   const [emailCopied, setEmailCopied] = useState(false);
 
   // Hero elements animate in on mount, staggered
@@ -184,6 +184,7 @@ export default function LandingPage({ onLogin }) {
           </button>
         </p>
         <p style={s.footerSub}>For billing issues, please use the Stripe customer portal after subscribing.</p>
+        <button style={s.footerPrivacy} onClick={onPrivacy}>Privacy Policy</button>
       </footer>
     </div>
   );
@@ -551,5 +552,17 @@ const s = {
     color: 'var(--text-muted)',
     margin: 0,
     opacity: 0.5,
+  },
+  footerPrivacy: {
+    marginTop: '12px',
+    background: 'none',
+    border: 'none',
+    color: 'var(--text-muted)',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.78rem',
+    textDecoration: 'underline',
+    cursor: 'pointer',
+    padding: 0,
+    opacity: 0.6,
   },
 };

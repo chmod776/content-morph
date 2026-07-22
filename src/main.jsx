@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import LandingPage from './components/LandingPage.jsx';
+import PrivacyPolicy from './components/PrivacyPolicy.jsx';
 import { SettingsProvider } from './context/SettingsContext.jsx';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { ProfileProvider } from './context/ProfileContext.jsx';
@@ -9,6 +10,11 @@ import './index.css';
 
 function Root() {
   const { isAuthenticated, loading, login } = useAuth();
+  const [showPrivacy, setShowPrivacy] = useState(false);
+
+  if (showPrivacy) {
+    return <PrivacyPolicy onBack={() => setShowPrivacy(false)} />;
+  }
 
   if (loading) {
     return (
@@ -28,12 +34,12 @@ function Root() {
   }
 
   if (!isAuthenticated) {
-    return <LandingPage onLogin={login} />;
+    return <LandingPage onLogin={login} onPrivacy={() => setShowPrivacy(true)} />;
   }
 
   return (
     <ProfileProvider>
-      <App />
+      <App onPrivacy={() => setShowPrivacy(true)} />
     </ProfileProvider>
   );
 }

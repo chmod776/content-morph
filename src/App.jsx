@@ -16,7 +16,7 @@ import { apiFetch } from './utils/apiFetch';
 
 const MAX_HISTORY = 50;
 
-export default function App() {
+export default function App({ onPrivacy }) {
   const { settings } = useSettings();
   const { profile, profileLoading } = useProfile();
   const { user, logout, login } = useAuth();
@@ -490,6 +490,7 @@ export default function App() {
           {emailCopied ? '✓ Copied!' : 'contentmorph71@gmail.com'}
         </button>
         <p style={styles.footerDisclaimer}>I read everything, but I can't respond to everyone. For billing issues, please use the Stripe customer portal.</p>
+        <button style={styles.footerPrivacy} onClick={onPrivacy}>Privacy Policy</button>
       </footer>
 
       <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} subscription={subscription} onAccountDeleted={logout} />
@@ -825,5 +826,18 @@ const styles = {
     border: 'none',
     padding: 0,
     cursor: 'pointer',
+  },
+  footerPrivacy: {
+    display: 'block',
+    marginTop: '10px',
+    background: 'none',
+    border: 'none',
+    color: 'var(--text-muted)',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.78rem',
+    textDecoration: 'underline',
+    cursor: 'pointer',
+    padding: 0,
+    opacity: 0.6,
   },
 };
