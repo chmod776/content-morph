@@ -37,8 +37,8 @@ export default function PricingPage({ user, onLogout, checkoutCancelled }) {
         <ul style={styles.featureList}>
           {[
             'Unlimited content generations',
-            'All platforms — LinkedIn, Twitter, Instagram & more',
-            'Brand voice & writing samples',
+            'LinkedIn, X & Instagram posts — plus YouTube title, description & chapters',
+            'Your voice learned once from your writing samples',
             'Generation history',
             'Cancel anytime',
           ].map(f => (

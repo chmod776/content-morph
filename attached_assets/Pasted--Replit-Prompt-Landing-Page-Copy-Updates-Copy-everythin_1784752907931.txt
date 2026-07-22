@@ -1,0 +1,57 @@
+# Replit Prompt: Landing Page Copy Updates
+
+Copy everything below into Replit as your update instructions. These are copy/content changes to the existing landing page — no new sections or layout needed unless noted.
+
+---
+
+## 1. Make the pricing differentiation explicit (priority)
+
+Right now "unlimited generations" is just one item in a 6-item feature grid. Add a short line directly under the price ($20.91/month) that calls out the actual competitive advantage — most alternatives cap free/low-tier usage (e.g. 5 posts/day) or start much higher ($49+/mo) with credit-based limits.
+
+Suggested line under the price:
+> No credits. No daily caps. No per-post pricing. One price, everything included.
+
+## 2. Merge "Brand voice" and "Writing samples" into a single card (priority)
+
+These two cards currently say close to the same thing. Combine into one card with a sharper pitch: the value isn't just "it sounds like you," it's that the user never has to re-explain their voice every time, unlike prompting a general AI tool from scratch each session.
+
+Suggested card copy:
+> **Your voice, set once**
+> Give it 3 writing samples one time. Every post after that — for as long as you use it — sounds like you, without re-explaining your tone every session.
+
+Remove the two separate existing cards ("Brand voice" and "Writing samples") and replace with this single card. Use the freed-up grid slot for item #4 below.
+
+## 3. Update the YouTube feature copy to reflect what it actually does (priority)
+
+Currently YouTube is listed alongside LinkedIn, X, and Instagram as if it's the same kind of output (a post). It's not — it's title, description, and chapter generation for a video *before* the user publishes it, generated from an uploaded video file (audio is extracted and transcribed, then run through the same voice engine as the rest of the app).
+
+This needs to be accurate so it doesn't read like a video-editing/clip tool (which it isn't) or get compared to that category.
+
+Update anywhere YouTube is mentioned ("All major platforms" card, "Pick your platforms" step, pricing feature list) to be specific, e.g.:
+
+> LinkedIn, X, and Instagram posts — plus YouTube title, description, and chapters generated from your video before you publish it.
+
+Consider adding a fourth step or a short line in the "How it works" section acknowledging this is a slightly different flow (upload video vs. paste notes) rather than implying every platform works identically.
+
+## 4. Downgrade "Live streaming output" from a top-level feature card
+
+This is a nice UX touch but not something people choose the product for. Remove it as a standalone card in the "Everything you need" grid. Instead, mention it briefly as a detail in the "Get ready-to-post content" step copy (step 3 of "How it works"), e.g. appending something like "...streamed live to your screen as it's written" to the existing step 3 description, which already gestures at this.
+
+Use the freed-up card slot (combined with the slot freed by item #2) for a card that reflects an actual differentiator — for example, something about the product being built for messy/unstructured input specifically (rough notes, half-formed ideas) rather than requiring a polished draft to start from, since that's a real gap versus competitors who assume clean input.
+
+Suggested new card:
+> **Built for messy ideas**
+> A half-formed thought, a voice memo transcript, a bullet list at 11pm — you don't need a polished draft to start.
+
+## 5. No changes needed before launch, but noting for later
+
+Competitors like PostEverywhere also support Threads, TikTok captions, and Pinterest for free. Not required for this update — just don't claim "all platforms" in absolute terms anywhere; keep language to "all major platforms" or name them explicitly, so it stays accurate as-is.
+
+---
+
+## Summary of net changes to the "Everything you need" grid
+
+- Remove: "Brand voice" card, "Writing samples" card, "Live streaming output" card
+- Add: "Your voice, set once" (merged) card, "Built for messy ideas" card
+- Keep: "Unlimited generations," "All major platforms" (with updated YouTube copy), "Generation history"
+- End result: same 6-card grid, refreshed content, more accurate and differentiated copy throughout.

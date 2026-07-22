@@ -105,8 +105,8 @@ export default function LandingPage({ onLogin }) {
         <div style={s.steps}>
           {[
             { n: '1', title: 'Paste your notes', desc: 'Dump your raw ideas, bullet points, or a rough draft. No polish needed.' },
-            { n: '2', title: 'Pick your platforms', desc: 'Select LinkedIn, X, Instagram, YouTube, or all of them at once.' },
-            { n: '3', title: 'Get ready-to-post content', desc: 'Your notes are rewritten into platform-native copy, streamed live to your screen.' },
+            { n: '2', title: 'Pick your platforms', desc: 'Select LinkedIn, X, Instagram, or all at once. Adding YouTube? Upload your video and get a title, description, and chapters ready before you publish.' },
+            { n: '3', title: 'Get ready-to-post content', desc: 'Your notes are rewritten into platform-native copy, streamed live to your screen as it\'s written.' },
           ].map((step, i) => (
             <RevealCard key={step.n} delay={i * 120} cardStyle={s.step}>
               <div style={s.stepNum}>{step.n}</div>
@@ -124,12 +124,11 @@ export default function LandingPage({ onLogin }) {
         </Reveal>
         <div style={s.features}>
           {[
-            { icon: '✦', title: 'Unlimited generations', desc: 'Run as many generations as you want. No caps, no credits.' },
-            { icon: '🎯', title: 'All major platforms', desc: 'LinkedIn, X, Instagram, and YouTube.' },
-            { icon: '🗣️', title: 'Brand voice', desc: 'Set your tone once. Every post sounds like you, not a robot.' },
-            { icon: '✍️', title: 'Writing samples', desc: 'Upload examples of your writing and every post mirrors your style exactly.' },
+            { icon: '✦', title: 'Unlimited generations', desc: 'Run as many generations as you want. No caps, no credits, no daily limits.' },
+            { icon: '🎯', title: 'All major platforms', desc: 'LinkedIn, X, and Instagram posts — plus YouTube title, description, and chapters generated from your video before you publish it.' },
+            { icon: '🗣️', title: 'Your voice, set once', desc: 'Give it 3 writing samples one time. Every post after that sounds like you, without re-explaining your tone every session.' },
+            { icon: '💡', title: 'Built for messy ideas', desc: 'A half-formed thought, a voice memo transcript, a bullet list at 11pm — you don\'t need a polished draft to start.' },
             { icon: '📋', title: 'Generation history', desc: 'Every output is saved so you can revisit, tweak, or repost anything.' },
-            { icon: '⚡', title: 'Live streaming output', desc: 'Watch your content appear word by word. No waiting for a wall of text.' },
           ].map((f, i) => (
             <RevealCard key={f.title} delay={i * 80} cardStyle={s.featureCard}>
               <span style={s.featureIcon}>{f.icon}</span>
@@ -152,13 +151,13 @@ export default function LandingPage({ onLogin }) {
               <span style={s.pricingDollar}>$20.91</span>
               <span style={s.pricingPer}> / month</span>
             </div>
+            <p style={s.pricingNoCaps}>No credits. No daily caps. No per-post pricing. One price, everything included.</p>
             <ul style={s.pricingList}>
               {[
                 'Unlimited content generations',
-                'All platforms: LinkedIn, X, Instagram & YouTube',
-                'Brand voice & writing samples',
+                'LinkedIn, X & Instagram posts — plus YouTube title, description & chapters',
+                'Your voice learned once from your writing samples',
                 'Full generation history',
-                'Live streaming output',
                 'Cancel anytime from your account',
               ].map(item => (
                 <li key={item} style={s.pricingItem}>
@@ -505,6 +504,14 @@ const s = {
     cursor: 'pointer',
     marginBottom: '12px',
     transition: 'opacity 0.2s',
+  },
+  pricingNoCaps: {
+    textAlign: 'center',
+    fontSize: '0.8rem',
+    color: 'var(--text-muted)',
+    margin: '-20px 0 28px',
+    lineHeight: 1.5,
+    opacity: 0.8,
   },
   pricingSecure: {
     textAlign: 'center',
