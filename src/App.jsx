@@ -16,7 +16,7 @@ import { apiFetch } from './utils/apiFetch';
 
 const MAX_HISTORY = 50;
 
-export default function App({ onPrivacy }) {
+export default function App({ onPrivacy, onTerms }) {
   const { settings } = useSettings();
   const { profile, profileLoading } = useProfile();
   const { user, logout, login } = useAuth();
@@ -411,6 +411,7 @@ export default function App({ onPrivacy }) {
         onLogout={logout}
         checkoutCancelled={checkoutCancelledRef.current}
         onPrivacy={onPrivacy}
+        onTerms={onTerms}
       />
     );
   }
@@ -491,7 +492,11 @@ export default function App({ onPrivacy }) {
           {emailCopied ? '✓ Copied!' : 'contentmorph71@gmail.com'}
         </button>
         <p style={styles.footerDisclaimer}>I read everything, but I can't respond to everyone. For billing issues, please use the Stripe customer portal.</p>
-        <button style={styles.footerPrivacy} onClick={onPrivacy}>Privacy Policy</button>
+        <span style={styles.footerLegalLinks}>
+          <button style={styles.footerPrivacy} onClick={onTerms}>Terms of Service</button>
+          <span style={styles.footerLegalSep}>·</span>
+          <button style={styles.footerPrivacy} onClick={onPrivacy}>Privacy Policy</button>
+        </span>
       </footer>
 
       <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} subscription={subscription} onAccountDeleted={logout} />
@@ -828,9 +833,19 @@ const styles = {
     padding: 0,
     cursor: 'pointer',
   },
-  footerPrivacy: {
-    display: 'block',
+  footerLegalLinks: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
     marginTop: '10px',
+  },
+  footerLegalSep: {
+    color: 'var(--text-muted)',
+    fontSize: '0.78rem',
+    opacity: 0.4,
+  },
+  footerPrivacy: {
     background: 'none',
     border: 'none',
     color: 'var(--text-muted)',

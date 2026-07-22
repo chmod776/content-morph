@@ -59,7 +59,7 @@ function RevealCard({ children, delay = 0, cardStyle = {} }) {
   );
 }
 
-export default function LandingPage({ onLogin, onPrivacy }) {
+export default function LandingPage({ onLogin, onPrivacy, onTerms }) {
   const [agreed, setAgreed] = React.useState(false);
   const [emailCopied, setEmailCopied] = useState(false);
 
@@ -176,6 +176,10 @@ export default function LandingPage({ onLogin, onPrivacy }) {
               />
               <span style={s.agreeText}>
                 I agree to the{' '}
+                <button style={s.agreeLink} onClick={e => { e.preventDefault(); onTerms(); }}>
+                  Terms of Service
+                </button>
+                {' '}and{' '}
                 <button style={s.agreeLink} onClick={e => { e.preventDefault(); onPrivacy(); }}>
                   Privacy Policy
                 </button>
@@ -204,7 +208,11 @@ export default function LandingPage({ onLogin, onPrivacy }) {
           </button>
         </p>
         <p style={s.footerSub}>For billing issues, please use the Stripe customer portal after subscribing.</p>
-        <button style={s.footerPrivacy} onClick={onPrivacy}>Privacy Policy</button>
+        <div style={s.footerLegalLinks}>
+          <button style={s.footerPrivacy} onClick={onTerms}>Terms of Service</button>
+          <span style={s.footerLegalSep}>·</span>
+          <button style={s.footerPrivacy} onClick={onPrivacy}>Privacy Policy</button>
+        </div>
       </footer>
     </div>
   );
@@ -573,8 +581,19 @@ const s = {
     margin: 0,
     opacity: 0.5,
   },
-  footerPrivacy: {
+  footerLegalLinks: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
     marginTop: '12px',
+  },
+  footerLegalSep: {
+    color: 'var(--text-muted)',
+    fontSize: '0.78rem',
+    opacity: 0.4,
+  },
+  footerPrivacy: {
     background: 'none',
     border: 'none',
     color: 'var(--text-muted)',

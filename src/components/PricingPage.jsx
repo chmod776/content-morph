@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { apiFetch } from '../utils/apiFetch';
 
-export default function PricingPage({ user, onLogout, checkoutCancelled, onPrivacy }) {
+export default function PricingPage({ user, onLogout, checkoutCancelled, onPrivacy, onTerms }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [agreed, setAgreed] = useState(false);
@@ -64,6 +64,10 @@ export default function PricingPage({ user, onLogout, checkoutCancelled, onPriva
           />
           <span style={styles.agreeText}>
             I agree to the{' '}
+            <button style={styles.agreeLink} onClick={e => { e.preventDefault(); onTerms?.(); }}>
+              Terms of Service
+            </button>
+            {' '}and{' '}
             <button style={styles.agreeLink} onClick={e => { e.preventDefault(); onPrivacy?.(); }}>
               Privacy Policy
             </button>
