@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, History, Settings, LogOut, ChevronDown, User, Youtube } from 'lucide-react';
+import { Send, History, Settings, LogOut, ChevronDown, User } from 'lucide-react';
 import { useTranslation } from '../hooks/useTranslation';
 import { useAuth } from '../context/AuthContext';
 
-export default function InputPanel({ input, setInput, isGenerating, onGenerate, onSettingsOpen, onHistoryOpen, onYouTubeOpen, historyCount, settingsRef, gearPulse }) {
+export default function InputPanel({ input, setInput, isGenerating, onGenerate, onSettingsOpen, onHistoryOpen, historyCount, settingsRef, gearPulse }) {
   const t = useTranslation();
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -57,11 +57,6 @@ export default function InputPanel({ input, setInput, isGenerating, onGenerate, 
               </div>
             )}
           </div>
-
-          <button style={styles.ytBtn} title="YouTube Studio" onClick={onYouTubeOpen}>
-            <Youtube size={15} style={{ color: '#FF0000' }} />
-            <span style={styles.ytBtnLabel}>YouTube</span>
-          </button>
 
           <button style={{ ...styles.iconBtn, position: 'relative' }} title={t.history} onClick={onHistoryOpen}>
             <History size={16} />
@@ -320,22 +315,5 @@ const styles = {
     fontSize: '1.15rem',
     fontFamily: 'var(--font-body)',
     transition: 'all 0.2s ease'
-  },
-  ytBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '5px',
-    backgroundColor: 'transparent',
-    border: '1px solid var(--border-color)',
-    borderRadius: '8px',
-    padding: '6px 10px',
-    cursor: 'pointer',
-    transition: 'border-color 0.15s',
-  },
-  ytBtnLabel: {
-    fontSize: '0.78rem',
-    fontFamily: 'var(--font-body)',
-    color: 'var(--text-muted)',
-    fontWeight: '500',
   },
 };

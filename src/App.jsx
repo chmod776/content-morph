@@ -7,7 +7,7 @@ import SettingsPanel from './components/SettingsPanel';
 import HistoryPanel from './components/HistoryPanel';
 import OnboardingModal from './components/OnboardingModal';
 import PricingPage from './components/PricingPage';
-import YouTubePrepPanel from './components/YouTubePrepPanel';
+import YouTubeModal from './components/YouTubeModal';
 import { platforms } from './platforms';
 import { useSettings } from './context/SettingsContext';
 import { useProfile } from './context/ProfileContext';
@@ -42,7 +42,7 @@ export default function App() {
   const [showPaymentFailedBanner, setShowPaymentFailedBanner] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [showSessionExpiredModal, setShowSessionExpiredModal] = useState(false);
-  const [youtubePrepOpen, setYoutubePrepOpen] = useState(false);
+  const [youtubeModal, setYoutubeModal] = useState({ open: false, pendingInput: '', pendingPlatforms: [] });
 
   // Restore any draft the user had when their session expired
   useEffect(() => {
@@ -280,20 +280,106 @@ export default function App() {
       .catch(() => {});
   };
 
-  const handleGenerate = () => {
-    const currentInput = input;
-    const currentPlatforms = [...selectedPlatforms];
+  // Generates YouTube title + description + chapters via /api/youtube/generate.
+  // transcriptData = { transcript, segments } from a video upload, or null to use notes.
+  const generateYouTubePlatform = async (notes, transcriptData) => {
+    const transcript       = transcriptData?.transcript || notes;
+    const isVideoTranscript = !!transcriptData;
+    const segments         = transcriptData?.segments || [];
+
+    setLoadingStates(prev => ({ ...prev, youtube: true }));
+    setErrors(prev => ({ ...prev, youtube: false }));
+    setOutputs(prev => ({ ...prev, youtube: '' }));
+
+    try {
+      const response = await apiFetch('/api/youtube/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript, isVideoTranscript, segments }),
+      });
+
+      if (!response.ok) throw new Error(`API Error: ${response.status}`);
+
+      let fullText = '';
+      const reader  = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer    = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (const line of lines) {
+          if (line.startsWith('data: ') && line.trim() !== 'data: [DONE]') {
+            let parsed = null;
+            try { parsed = JSON.parse(line.trim().slice(6)); } catch { continue; }
+            const text = parsed?.choices?.[0]?.delta?.content || '';
+            if (text) {
+              fullText += text;
+              flushSync(() => { setOutputs(prev => ({ ...prev, youtube: fullText })); });
+              await new Promise(resolve => requestAnimationFrame(resolve));
+            }
+          }
+        }
+      }
+
+      // Replace structural markers with readable labels for the output panel
+      const display = fullText
+        .replace(/###TITLE###\s*/g, 'TITLE:\n')
+        .replace(/###DESCRIPTION###\s*/g, '\n\nDESCRIPTION:\n')
+        .replace(/###CHAPTERS###\s*/g, '\n\nCHAPTERS:\n')
+        .trim();
+
+      setOutputs(prev => ({ ...prev, youtube: display }));
+      return display;
+    } catch (err) {
+      console.error('Error generating YouTube:', err);
+      setErrors(prev => ({ ...prev, youtube: true }));
+      return null;
+    } finally {
+      setLoadingStates(prev => ({ ...prev, youtube: false }));
+    }
+  };
+
+  // Runs all generation (YouTube-aware). youtubeTranscriptData = null (use notes) or
+  // { transcript, segments } from a video upload.
+  const doGenerate = (currentInput, currentPlatforms, youtubeTranscriptData) => {
     const completedOutputs = {};
     let completedCount = 0;
+    const total = currentPlatforms.length;
+
+    const onPlatformDone = (platformId, result) => {
+      if (result) completedOutputs[platformId] = result;
+      completedCount++;
+      if (completedCount === total && Object.keys(completedOutputs).length > 0) {
+        addToHistory(currentInput, currentPlatforms, completedOutputs);
+      }
+    };
+
     currentPlatforms.forEach(platformId => {
-      generateForPlatform(platformId, currentInput).then((result) => {
-        if (result) completedOutputs[platformId] = result;
-        completedCount++;
-        if (completedCount === currentPlatforms.length && Object.keys(completedOutputs).length > 0) {
-          addToHistory(currentInput, currentPlatforms, completedOutputs);
-        }
-      });
+      if (platformId === 'youtube') {
+        generateYouTubePlatform(currentInput, youtubeTranscriptData)
+          .then(result => onPlatformDone('youtube', result));
+      } else {
+        generateForPlatform(platformId, currentInput)
+          .then(result => onPlatformDone(platformId, result));
+      }
     });
+  };
+
+  const handleGenerate = () => {
+    const currentInput     = input;
+    const currentPlatforms = [...selectedPlatforms];
+
+    if (currentPlatforms.includes('youtube')) {
+      // Let the user choose: notes or video upload
+      setYoutubeModal({ open: true, pendingInput: currentInput, pendingPlatforms: currentPlatforms });
+      return;
+    }
+
+    doGenerate(currentInput, currentPlatforms, null);
   };
 
   const handleHistoryRestore = (entry) => {
@@ -373,7 +459,6 @@ export default function App() {
           onGenerate={handleGenerate}
           onSettingsOpen={() => setSettingsOpen(true)}
           onHistoryOpen={() => setHistoryOpen(true)}
-          onYouTubeOpen={() => setYoutubePrepOpen(true)}
           historyCount={history.length}
           settingsRef={settingsRef}
           gearPulse={gearPulse}
@@ -408,7 +493,14 @@ export default function App() {
       </footer>
 
       <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} subscription={subscription} />
-      <YouTubePrepPanel isOpen={youtubePrepOpen} onClose={() => setYoutubePrepOpen(false)} />
+      <YouTubeModal
+        isOpen={youtubeModal.open}
+        onClose={() => setYoutubeModal(m => ({ ...m, open: false }))}
+        onContinue={(transcriptData) => {
+          setYoutubeModal(m => ({ ...m, open: false }));
+          doGenerate(youtubeModal.pendingInput, youtubeModal.pendingPlatforms, transcriptData);
+        }}
+      />
       <HistoryPanel
         isOpen={historyOpen}
         onClose={() => setHistoryOpen(false)}
