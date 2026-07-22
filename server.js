@@ -473,19 +473,23 @@ app.delete('/api/account', isAuthenticated, async (req, res) => {
       }
     }
 
-    // 2. Delete all user data from Postgres (CASCADE removes profiles,
-    //    sessions, history, video_usage automatically)
-    await pool.query('DELETE FROM users WHERE id=$1', [userId]);
-
-    // 3. Remove the Supabase auth record
+    // 2. Remove the Supabase auth record
     try {
       await getSupabaseAdmin().auth.admin.deleteUser(userId);
     } catch (sbErr) {
       console.warn('Account deletion: Supabase deleteUser failed:', sbErr.message);
     }
 
-    // 4. Destroy the Express session
-    req.session.destroy(() => {});
+    // 3. Destroy session FIRST, then delete from DB inside the callback.
+    //    This prevents the ON DELETE CASCADE on `sessions` from racing with
+    //    Express's own session finalisation (which would return HTML 500).
+    req.session.destroy(async () => {
+      try {
+        await pool.query('DELETE FROM users WHERE id=$1', [userId]);
+      } catch (dbErr) {
+        console.error('Account deletion: DB delete failed:', dbErr.message);
+      }
+    });
 
     res.json({ ok: true });
   } catch (err) {
