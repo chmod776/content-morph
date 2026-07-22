@@ -626,8 +626,12 @@ app.post('/api/youtube/upload', isAuthenticated, (req, res, next) => {
       safeDelete(audioPath);
 
       if (!whisperRes.ok) {
-        const errText = await whisperRes.text();
-        return res.status(502).json({ error: `Transcription failed: ${errText}` });
+        const errBody = await whisperRes.json().catch(() => ({}));
+        const detail  = errBody?.error?.message || '';
+        const msg = detail.toLowerCase().includes('audio')
+          ? 'The audio track couldn\'t be read. Try a different video format or trim the file.'
+          : 'Transcription failed. Please try again — if it keeps happening, use your notes instead.';
+        return res.status(502).json({ error: msg });
       }
 
       const whisperData = await whisperRes.json();
@@ -658,7 +662,10 @@ app.post('/api/youtube/upload', isAuthenticated, (req, res, next) => {
       // Final safety net: delete any remaining tmp files
       safeDelete(videoPath, audioPath);
       console.error('YouTube upload error:', err.message);
-      res.status(500).json({ error: err.message || 'Processing failed' });
+      const friendly = err.message?.startsWith('Video is') || err.message?.startsWith('Unsupported')
+        ? err.message
+        : 'Something went wrong processing your video. Please try again.';
+      res.status(500).json({ error: friendly });
     }
   });
 });
