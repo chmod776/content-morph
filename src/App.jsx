@@ -402,9 +402,15 @@ export default function App({ onPrivacy, onTerms }) {
 
   const isGenerating = Object.values(loadingStates).some(state => state);
 
-  // Show paywall only for users who have never subscribed (status === null)
-  // Users with a lapsed/failed subscription (status is non-null but inactive) see the app + a banner
-  if (!subLoading && subscription && !subscription.active && subscription.status === null) {
+  // Block access for:
+  //   status === null      → never subscribed (first-time paywall)
+  //   canceled/unpaid/etc  → subscription has fully lapsed (resubscribe wall)
+  // past_due stays open — Stripe is still retrying; user sees a warning banner instead.
+  const BLOCKING_STATUSES = new Set(['canceled', 'unpaid', 'incomplete_expired', 'paused']);
+  const isLapsed = subscription && !subscription.active && BLOCKING_STATUSES.has(subscription.status);
+  const isNeverSubscribed = subscription && !subscription.active && subscription.status === null;
+
+  if (!subLoading && (isNeverSubscribed || isLapsed)) {
     return (
       <PricingPage
         user={user}
@@ -412,6 +418,8 @@ export default function App({ onPrivacy, onTerms }) {
         checkoutCancelled={checkoutCancelledRef.current}
         onPrivacy={onPrivacy}
         onTerms={onTerms}
+        lapsed={isLapsed}
+        lapsedReason={subscription?.status}
       />
     );
   }

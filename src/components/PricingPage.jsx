@@ -1,7 +1,14 @@
 import React, { useState } from 'react';
 import { apiFetch } from '../utils/apiFetch';
 
-export default function PricingPage({ user, onLogout, checkoutCancelled, onPrivacy, onTerms }) {
+const LAPSED_MESSAGES = {
+  canceled:            'Your subscription has been canceled.',
+  unpaid:              'Your last payment could not be collected.',
+  incomplete_expired:  'Your subscription setup did not complete.',
+  paused:              'Your subscription is currently paused.',
+};
+
+export default function PricingPage({ user, onLogout, checkoutCancelled, onPrivacy, onTerms, lapsed, lapsedReason }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [agreed, setAgreed] = useState(false);
@@ -28,7 +35,17 @@ export default function PricingPage({ user, onLogout, checkoutCancelled, onPriva
     <div style={styles.page}>
       <div style={styles.card}>
         <h1 style={styles.logo}>Content Morph</h1>
-        <p style={styles.tagline}>Transform your raw notes into platform-ready posts.</p>
+        {lapsed ? (
+          <div style={styles.lapsedNotice}>
+            <span style={styles.lapsedIcon}>⚠️</span>
+            <p style={styles.lapsedText}>
+              {LAPSED_MESSAGES[lapsedReason] || 'Your subscription is no longer active.'}{' '}
+              Resubscribe below to get back in.
+            </p>
+          </div>
+        ) : (
+          <p style={styles.tagline}>Transform your raw notes into platform-ready posts.</p>
+        )}
 
         <div style={styles.priceBox}>
           <span style={styles.priceAmount}>$20.91</span>
@@ -161,6 +178,29 @@ const styles = {
     color: 'var(--text-main)',
     fontWeight: '700',
     flexShrink: 0,
+  },
+  lapsedNotice: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '10px',
+    backgroundColor: 'rgba(224, 92, 92, 0.08)',
+    border: '1px solid rgba(224, 92, 92, 0.25)',
+    borderRadius: '10px',
+    padding: '14px 16px',
+    marginBottom: '24px',
+    textAlign: 'left',
+  },
+  lapsedIcon: {
+    fontSize: '1rem',
+    flexShrink: 0,
+    marginTop: '1px',
+  },
+  lapsedText: {
+    margin: 0,
+    fontSize: '0.88rem',
+    color: '#e05c5c',
+    lineHeight: 1.5,
+    fontFamily: 'var(--font-body)',
   },
   cancelNotice: {
     color: '#e05c5c',
