@@ -125,10 +125,10 @@ export default function LandingPage({ onLogin, onPrivacy, onTerms }) {
         </Reveal>
         <div style={s.features}>
           {[
-            { icon: '✦', title: 'Unlimited generations', desc: 'Unlimited text generations — no credits, no daily limits. Video uploads include 6 hours of processing per month.' },
-            { icon: '🎯', title: 'All major platforms', desc: 'LinkedIn, X, and Instagram posts — plus YouTube title, description, and chapters generated from your video before you publish it.' },
+            { icon: '✦', title: 'Unlimited generations', desc: 'Unlimited text generations. No credits, no daily limits. Video uploads include 6 hours of processing per month.' },
+            { icon: '🎯', title: 'All major platforms', desc: 'LinkedIn, X, and Instagram posts. Plus YouTube title, description, and chapters generated from your video before you publish it.' },
             { icon: '🗣️', title: 'Your voice, set once', desc: 'Give it 3 writing samples one time. Every post after that sounds like you, without re-explaining your tone every session.' },
-            { icon: '💡', title: 'Built for messy ideas', desc: 'A half-formed thought, a voice memo transcript, a bullet list at 11pm — you don\'t need a polished draft to start.' },
+            { icon: '💡', title: 'Built for messy ideas', desc: 'A half-formed thought, a voice memo transcript, a bullet list at 11pm. You don\'t need a polished draft to start.' },
             { icon: '📋', title: 'Generation history', desc: 'Every output is saved so you can revisit, tweak, or repost anything.' },
           ].map((f, i) => (
             <RevealCard key={f.title} delay={i * 80} cardStyle={s.featureCard}>
@@ -156,7 +156,7 @@ export default function LandingPage({ onLogin, onPrivacy, onTerms }) {
             <ul style={s.pricingList}>
               {[
                 'Unlimited text generations (video uploads: 6 hrs/month)',
-                'LinkedIn, X & Instagram posts — plus YouTube title, description & chapters',
+                'LinkedIn, X & Instagram posts. Plus YouTube title, description & chapters',
                 'Your voice learned once from your writing samples',
                 'Full generation history',
                 'Cancel anytime from your account',
