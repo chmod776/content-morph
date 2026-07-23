@@ -54,7 +54,7 @@ export default function PricingPage({ user, onLogout, checkoutCancelled, onPriva
 
         <ul style={styles.featureList}>
           {[
-            'Unlimited content generations',
+            'Unlimited text generations (video uploads: 6 hrs/month)',
             'LinkedIn, X & Instagram posts — plus YouTube title, description & chapters',
             'Your voice learned once from your writing samples',
             'Generation history',

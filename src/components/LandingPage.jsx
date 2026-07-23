@@ -125,7 +125,7 @@ export default function LandingPage({ onLogin, onPrivacy, onTerms }) {
         </Reveal>
         <div style={s.features}>
           {[
-            { icon: '✦', title: 'Unlimited generations', desc: 'Run as many generations as you want. No caps, no credits, no daily limits.' },
+            { icon: '✦', title: 'Unlimited generations', desc: 'Unlimited text generations — no credits, no daily limits. Video uploads include 6 hours of processing per month.' },
             { icon: '🎯', title: 'All major platforms', desc: 'LinkedIn, X, and Instagram posts — plus YouTube title, description, and chapters generated from your video before you publish it.' },
             { icon: '🗣️', title: 'Your voice, set once', desc: 'Give it 3 writing samples one time. Every post after that sounds like you, without re-explaining your tone every session.' },
             { icon: '💡', title: 'Built for messy ideas', desc: 'A half-formed thought, a voice memo transcript, a bullet list at 11pm — you don\'t need a polished draft to start.' },
@@ -152,10 +152,10 @@ export default function LandingPage({ onLogin, onPrivacy, onTerms }) {
               <span style={s.pricingDollar}>$20.91</span>
               <span style={s.pricingPer}> / month</span>
             </div>
-            <p style={s.pricingNoCaps}>No credits. No daily caps. No per-post pricing. One price, everything included.</p>
+            <p style={s.pricingNoCaps}>No credits. No daily caps. No per-post pricing. Video uploads include 6 hrs/month.</p>
             <ul style={s.pricingList}>
               {[
-                'Unlimited content generations',
+                'Unlimited text generations (video uploads: 6 hrs/month)',
                 'LinkedIn, X & Instagram posts — plus YouTube title, description & chapters',
                 'Your voice learned once from your writing samples',
                 'Full generation history',
